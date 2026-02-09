@@ -1,26 +1,127 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-brand-red: #8B2500;
+  --color-brand-orange: #D2691E;
+  --color-brand-gold: #DAA520;
+  --color-brand-cream: #FFF8DC;
+  --color-brand-dark: #1a0a00;
+  --color-brand-smoke: #2d1810;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  background: var(--color-brand-dark);
+  color: var(--color-brand-cream);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Smoky background effect */
+.smoky-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(139, 37, 0, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(210, 105, 30, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(218, 165, 32, 0.08) 0%, transparent 50%),
+    var(--color-brand-dark);
+}
+
+/* Fire glow button */
+.btn-fire {
+  background: linear-gradient(135deg, #8B2500, #D2691E, #DAA520);
+  color: white;
+  font-weight: 700;
+  padding: 0.75rem 2rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 15px rgba(210, 105, 30, 0.4);
+}
+
+.btn-fire:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(210, 105, 30, 0.6);
+}
+
+.btn-fire:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Ticket card */
+.ticket-card {
+  background: linear-gradient(145deg, rgba(45, 24, 16, 0.9), rgba(26, 10, 0, 0.95));
+  border: 2px solid rgba(218, 165, 32, 0.2);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.ticket-card:hover,
+.ticket-card.selected {
+  border-color: var(--color-brand-gold);
+  box-shadow: 0 0 30px rgba(218, 165, 32, 0.15);
+  transform: translateY(-4px);
+}
+
+.ticket-card.selected {
+  background: linear-gradient(145deg, rgba(139, 37, 0, 0.3), rgba(45, 24, 16, 0.9));
+}
+
+/* Form inputs */
+.form-input {
+  background: rgba(45, 24, 16, 0.8);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: var(--color-brand-cream);
+  width: 100%;
+  transition: border-color 0.3s ease;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-brand-gold);
+  box-shadow: 0 0 10px rgba(218, 165, 32, 0.1);
+}
+
+.form-input::placeholder {
+  color: rgba(255, 248, 220, 0.4);
+}
+
+/* Ember particles animation */
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) scale(0);
+    opacity: 0;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.ember {
+  position: fixed;
+  bottom: -10px;
+  width: 4px;
+  height: 4px;
+  background: var(--color-brand-orange);
+  border-radius: 50%;
+  animation: float-up linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Divider line */
+.divider-flame {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-brand-orange), var(--color-brand-gold), var(--color-brand-orange), transparent);
 }

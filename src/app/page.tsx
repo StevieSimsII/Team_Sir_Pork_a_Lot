@@ -1,65 +1,54 @@
-import Image from "next/image";
+import EmberParticles from "@/components/EmberParticles";
+import PurchaseForm from "@/components/PurchaseForm";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <>
+      <EmberParticles />
+      <div className="relative z-10 min-h-screen">
+        {/* Hero Section */}
+        <header className="text-center pt-12 pb-8 px-4">
+          <div className="max-w-3xl mx-auto">
+            {/* Logo / pig icon */}
+            <div className="text-7xl mb-4">🐷</div>
+            <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-2">
+              <span className="bg-gradient-to-r from-[#8B2500] via-[#D2691E] to-[#DAA520] bg-clip-text text-transparent">
+                Team Sir Pork a Lot
+              </span>
+            </h1>
+            <p className="text-xl sm:text-2xl text-[#DAA520] font-semibold mt-2">
+              Hogs for the Cause 2026
+            </p>
+            <div className="divider-flame mt-6 mx-auto max-w-xs" />
+          </div>
+        </header>
+
+        {/* Raffle Info */}
+        <section className="max-w-2xl mx-auto px-4 pb-4 text-center">
+          <h2 className="text-3xl font-bold mb-3 text-white">
+            🔥 Raffle Ticket Sale 🔥
+          </h2>
+          <p className="text-lg text-[#FFF8DC]/70 max-w-xl mx-auto">
+            Support <strong className="text-[#DAA520]">Team Sir Pork a Lot</strong>{" "}
+            by purchasing raffle tickets! Amazing prizes await — the more tickets
+            you grab, the more you save!
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        </section>
+
+        {/* Purchase Form Section */}
+        <section className="max-w-2xl mx-auto px-4 pb-16 pt-4">
+          <div className="bg-gradient-to-b from-[#2d1810]/80 to-[#1a0a00]/90 rounded-2xl p-6 sm:p-8 border border-[#DAA520]/10 shadow-2xl">
+            <PurchaseForm />
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="text-center py-8 text-sm text-[#FFF8DC]/40 border-t border-[#DAA520]/10">
+          <p>
+            &copy; 2026 Team Sir Pork a Lot — Hogs for the Cause
+          </p>
+        </footer>
+      </div>
+    </>
   );
 }
