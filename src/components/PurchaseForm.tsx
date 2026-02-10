@@ -157,7 +157,7 @@ export default function PurchaseForm() {
               Processing...
             </span>
           ) : (
-            "🔥 Purchase Tickets 🔥"
+            "Purchase Tickets"
           )}
         </button>
       </div>
