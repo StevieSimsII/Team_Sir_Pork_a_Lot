@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --color-brand-red: #8B2500;
-  --color-brand-orange: #D2691E;
-  --color-brand-gold: #DAA520;
-  --color-brand-cream: #FFF8DC;
-  --color-brand-dark: #1a0a00;
-  --color-brand-smoke: #2d1810;
+  --color-brand-navy: #2B3E5C;
+  --color-brand-dark-navy: #1E3050;
+  --color-brand-red: #823530;
+  --color-brand-light-red: #9A3D36;
+  --color-brand-cream: #E8D8BC;
+  --color-brand-parchment: #DED0B3;
+  --color-brand-light-blue: #8AACC4;
+  --color-brand-gold: #C2A24A;
 }
 
 @theme inline {
@@ -15,36 +17,41 @@
 }
 
 body {
-  background: var(--color-brand-dark);
-  color: var(--color-brand-cream);
+  background: var(--color-brand-cream);
+  color: var(--color-brand-dark-navy);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Smoky background effect */
+/* Sunburst background inspired by the poster */
 .smoky-bg {
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(139, 37, 0, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(210, 105, 30, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(218, 165, 32, 0.08) 0%, transparent 50%),
-    var(--color-brand-dark);
+    repeating-conic-gradient(
+      from 0deg at 50% 35%,
+      rgba(138, 172, 196, 0.18) 0deg 10deg,
+      transparent 10deg 20deg
+    ),
+    radial-gradient(ellipse at 50% 35%, rgba(138, 172, 196, 0.25) 0%, transparent 55%),
+    linear-gradient(180deg, var(--color-brand-cream) 0%, var(--color-brand-parchment) 100%);
 }
 
-/* Fire glow button */
+/* Main action button */
 .btn-fire {
-  background: linear-gradient(135deg, #8B2500, #D2691E, #DAA520);
-  color: white;
+  background: linear-gradient(135deg, #823530, #9A3D36);
+  color: var(--color-brand-cream);
   font-weight: 700;
   padding: 0.75rem 2rem;
   border-radius: 0.5rem;
   transition: all 0.3s ease;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  box-shadow: 0 4px 15px rgba(210, 105, 30, 0.4);
+  box-shadow: 0 4px 15px rgba(130, 53, 48, 0.3);
+  border: 2px solid rgba(194, 162, 74, 0.4);
 }
 
 .btn-fire:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(210, 105, 30, 0.6);
+  box-shadow: 0 6px 25px rgba(130, 53, 48, 0.4);
+  border-color: var(--color-brand-gold);
 }
 
 .btn-fire:disabled {
@@ -55,8 +62,8 @@ body {
 
 /* Ticket card */
 .ticket-card {
-  background: linear-gradient(145deg, rgba(45, 24, 16, 0.9), rgba(26, 10, 0, 0.95));
-  border: 2px solid rgba(218, 165, 32, 0.2);
+  background: linear-gradient(145deg, rgba(43, 62, 92, 0.06), rgba(232, 216, 188, 0.5));
+  border: 2px solid rgba(43, 62, 92, 0.15);
   border-radius: 1rem;
   padding: 1.5rem;
   transition: all 0.3s ease;
@@ -65,22 +72,23 @@ body {
 
 .ticket-card:hover,
 .ticket-card.selected {
-  border-color: var(--color-brand-gold);
-  box-shadow: 0 0 30px rgba(218, 165, 32, 0.15);
+  border-color: var(--color-brand-red);
+  box-shadow: 0 0 20px rgba(130, 53, 48, 0.1);
   transform: translateY(-4px);
 }
 
 .ticket-card.selected {
-  background: linear-gradient(145deg, rgba(139, 37, 0, 0.3), rgba(45, 24, 16, 0.9));
+  background: linear-gradient(145deg, rgba(130, 53, 48, 0.08), rgba(232, 216, 188, 0.6));
+  border-color: var(--color-brand-red);
 }
 
 /* Form inputs */
 .form-input {
-  background: rgba(45, 24, 16, 0.8);
-  border: 1px solid rgba(218, 165, 32, 0.3);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(43, 62, 92, 0.2);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
-  color: var(--color-brand-cream);
+  color: var(--color-brand-dark-navy);
   width: 100%;
   transition: border-color 0.3s ease;
   font-size: 1rem;
@@ -88,12 +96,12 @@ body {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--color-brand-gold);
-  box-shadow: 0 0 10px rgba(218, 165, 32, 0.1);
+  border-color: var(--color-brand-navy);
+  box-shadow: 0 0 10px rgba(43, 62, 92, 0.12);
 }
 
 .form-input::placeholder {
-  color: rgba(255, 248, 220, 0.4);
+  color: rgba(30, 48, 80, 0.35);
 }
 
 /* Ember particles animation */
@@ -113,15 +121,16 @@ body {
   bottom: -10px;
   width: 4px;
   height: 4px;
-  background: var(--color-brand-orange);
+  background: var(--color-brand-light-blue);
   border-radius: 50%;
   animation: float-up linear infinite;
   pointer-events: none;
   z-index: 0;
+  opacity: 0.4;
 }
 
 /* Divider line */
 .divider-flame {
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--color-brand-orange), var(--color-brand-gold), var(--color-brand-orange), transparent);
+  background: linear-gradient(90deg, transparent, var(--color-brand-red), var(--color-brand-gold), var(--color-brand-red), transparent);
 }
