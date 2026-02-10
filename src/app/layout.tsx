@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Team Sir Pork a Lot | Raffle Tickets",
+  title: "Sir Pork a Lot | Raffle Tickets",
   description:
     "Buy raffle tickets to support Team Sir Pork a Lot at Hogs for the Cause!",
 };

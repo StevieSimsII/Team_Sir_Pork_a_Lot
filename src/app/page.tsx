@@ -13,7 +13,7 @@ export default function Home() {
             <div className="text-7xl mb-4">🐷</div>
             <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-2">
               <span className="bg-gradient-to-r from-[#823530] via-[#9A3D36] to-[#823530] bg-clip-text text-transparent">
-                Team Sir Pork a Lot
+                Sir Pork a Lot
               </span>
             </h1>
             <p className="text-xl sm:text-2xl text-[#2B3E5C] font-semibold mt-2">
