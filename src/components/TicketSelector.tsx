@@ -11,10 +11,6 @@ function formatPrice(cents: number): string {
   return "$" + (cents / 100).toFixed(0);
 }
 
-function pricePerTicket(tier: TicketTier): string {
-  return "$" + (tier.price / tier.count / 100).toFixed(2);
-}
-
 export default function TicketSelector({
   selected,
   onSelect,
@@ -46,9 +42,7 @@ export default function TicketSelector({
             </span>
           </div>
 
-          <div className="text-sm text-[#2B3E5C]/60">
-            {pricePerTicket(tier)} per ticket
-          </div>
+          
 
           {/* Selection indicator */}
           {selected?.count === tier.count && (

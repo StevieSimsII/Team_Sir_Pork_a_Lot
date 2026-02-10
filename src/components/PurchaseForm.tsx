@@ -12,8 +12,7 @@ export default function PurchaseForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const isValid =
-    name.trim() && email.trim() && phone.trim() && selectedTier !== null;
+  const isValid = name.trim() && phone.trim() && selectedTier !== null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +87,7 @@ export default function PurchaseForm() {
         </div>
         <div>
           <label htmlFor="email" className="block text-sm mb-1 text-[#2B3E5C]/70">
-            Email Address *
+            Email Address (optional)
           </label>
           <input
             id="email"
@@ -97,7 +96,6 @@ export default function PurchaseForm() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
           />
         </div>
       </div>
