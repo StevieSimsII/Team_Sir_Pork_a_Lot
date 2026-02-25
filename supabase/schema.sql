@@ -3,7 +3,7 @@
 CREATE TABLE orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
-  email TEXT NOT NULL,
+  email TEXT,
   phone TEXT NOT NULL,
   ticket_count INTEGER NOT NULL,
   amount INTEGER NOT NULL, -- stored in cents
@@ -11,6 +11,9 @@ CREATE TABLE orders (
   stripe_session_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: make email optional (run once if table already exists)
+-- ALTER TABLE orders ALTER COLUMN email DROP NOT NULL;
 
 -- Enable Row Level Security
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
