@@ -1,11 +1,12 @@
 import Link from "next/link";
 
+const VENMO_USERNAME = "Sir-Pork-A-Lot";
+
 interface SuccessPageProps {
   searchParams: Promise<{
     amount?: string;
     tickets?: string;
     name?: string;
-    venmo?: string;
   }>;
 }
 
@@ -14,8 +15,17 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   const amountCents = params.amount ? parseInt(params.amount) : null;
   const amountDollars = amountCents ? (amountCents / 100).toFixed(2) : null;
   const tickets = params.tickets ? parseInt(params.tickets) : null;
-  const name = params.name ? decodeURIComponent(params.name) : null;
-  const venmoUrl = params.venmo ? decodeURIComponent(params.venmo) : null;
+  const name = params.name ?? null;
+
+  // Build the Venmo URL here to avoid double-encoding through query params
+  const venmoUrl =
+    tickets && amountDollars && name
+      ? `https://venmo.com/${VENMO_USERNAME}?txn=pay&amount=${amountDollars}&note=${encodeURIComponent(
+          `Hogs for the Cause 2026 - ${tickets} Raffle Ticket${
+            tickets > 1 ? "s" : ""
+          } (${name})`
+        )}`
+      : null;
 
   const hasOrderDetails = tickets && amountDollars && name && venmoUrl;
 

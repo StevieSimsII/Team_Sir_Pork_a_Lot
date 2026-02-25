@@ -52,19 +52,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build pre-populated Venmo deep link
-    const amountDollars = (amount / 100).toFixed(2);
-    const note = encodeURIComponent(
-      `Hogs for the Cause 2026 - ${ticketCount} Raffle Ticket${
-        ticketCount > 1 ? "s" : ""
-      } (${name})`
-    );
-    const venmoUrl = `https://venmo.com/${VENMO_USERNAME}?txn=pay&amount=${amountDollars}&note=${note}`;
-
-    // Redirect to success page with order details in query params
-    const successUrl = `/success?amount=${amount}&tickets=${ticketCount}&name=${encodeURIComponent(
-      name
-    )}&venmo=${encodeURIComponent(venmoUrl)}`;
+    // Redirect to success page — Venmo URL is built there to avoid double-encoding
+    const successUrl = `/success?amount=${amount}&tickets=${ticketCount}&name=${encodeURIComponent(name)}`;
 
     return NextResponse.json({ url: successUrl });
   } catch (err) {
