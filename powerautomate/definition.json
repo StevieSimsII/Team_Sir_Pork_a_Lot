@@ -1,0 +1,140 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_office365": {
+        "connectionName": "shared_office365",
+        "source": "Invoker",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "displayName": "Office 365 Outlook"
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "outputs": {},
+      "triggers": {
+        "When_a_new_email_arrives": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365",
+              "operationId": "GetOnNewEmail_V3",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "folderPath": "Inbox",
+              "from": "venmo@venmo.com",
+              "subjectFilter": "You received",
+              "includeAttachments": false,
+              "importance": "Any",
+              "fetchOnlyWithAttachment": false,
+              "fetchOnlyUnread": true
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 2
+          },
+          "metadata": {
+            "operationMetadataId": "venmo-trigger"
+          }
+        }
+      },
+      "actions": {
+        "Extract_Amount": {
+          "runAfter": {},
+          "type": "Compose",
+          "inputs": "@trim(first(split(last(split(triggerOutputs()?['body/subject'], '$')), ' ')))",
+          "description": "Extracts '25.00' from 'You received $25.00 from John Doe'"
+        },
+        "Extract_Name": {
+          "runAfter": {},
+          "type": "Compose",
+          "inputs": "@trim(last(split(triggerOutputs()?['body/subject'], ' from ')))",
+          "description": "Extracts 'John Doe' from 'You received $25.00 from John Doe'"
+        },
+        "Call_Mark_Paid_Webhook": {
+          "runAfter": {
+            "Extract_Amount": ["Succeeded"],
+            "Extract_Name": ["Succeeded"]
+          },
+          "type": "Http",
+          "inputs": {
+            "method": "POST",
+            "uri": "https://YOUR_APP_DOMAIN/api/mark-paid",
+            "headers": {
+              "Authorization": "Bearer YOUR_MARK_PAID_SECRET",
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "name": "@{outputs('Extract_Name')}",
+              "amount": "@{outputs('Extract_Amount')}"
+            }
+          },
+          "description": "Calls the Next.js /api/mark-paid endpoint to flip order status to paid"
+        },
+        "Check_Response": {
+          "runAfter": {
+            "Call_Mark_Paid_Webhook": ["Succeeded", "Failed"]
+          },
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@outputs('Call_Mark_Paid_Webhook')['statusCode']",
+                  200
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Send_Success_Notification": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/To": "YOUR_EMAIL@example.com",
+                  "emailMessage/Subject": "✅ Venmo payment confirmed — @{outputs('Extract_Name')} ($@{outputs('Extract_Amount')})",
+                  "emailMessage/Body": "<p>Order marked as <strong>paid</strong> in Supabase.</p><ul><li><strong>Name:</strong> @{outputs('Extract_Name')}</li><li><strong>Amount:</strong> $@{outputs('Extract_Amount')}</li><li><strong>Time:</strong> @{utcNow()}</li></ul>",
+                  "emailMessage/Importance": "Normal",
+                  "emailMessage/IsHtml": true
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Send_Failure_Alert": {
+                "runAfter": {},
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_office365",
+                    "operationId": "SendEmailV2",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                  },
+                  "parameters": {
+                    "emailMessage/To": "YOUR_EMAIL@example.com",
+                    "emailMessage/Subject": "⚠️ Venmo payment needs manual review — @{outputs('Extract_Name')} ($@{outputs('Extract_Amount')})",
+                    "emailMessage/Body": "<p>Power Automate could <strong>not</strong> automatically match this payment to an order.</p><ul><li><strong>Name:</strong> @{outputs('Extract_Name')}</li><li><strong>Amount:</strong> $@{outputs('Extract_Amount')}</li><li><strong>HTTP Status:</strong> @{outputs('Call_Mark_Paid_Webhook')['statusCode']}</li><li><strong>Response:</strong> @{body('Call_Mark_Paid_Webhook')}</li></ul><p>Please update the order manually in Supabase.</p>",
+                    "emailMessage/Importance": "High",
+                    "emailMessage/IsHtml": true
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

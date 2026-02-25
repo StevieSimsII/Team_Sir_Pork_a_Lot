@@ -15,11 +15,21 @@ CREATE TABLE orders (
 -- Enable Row Level Security
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 
--- Policy: Allow inserts from the anon key (public form submissions)
-CREATE POLICY "Allow public inserts" ON orders
+-- Policy: Allow limited anonymous inserts from public form submissions
+-- Restrict fields anon can set to prevent privilege escalation.
+DROP POLICY IF EXISTS "Allow public inserts" ON orders;
+DROP POLICY IF EXISTS "Allow authenticated inserts" ON orders;
+CREATE POLICY "Allow limited anon inserts" ON orders
   FOR INSERT
   TO anon
-  WITH CHECK (true);
+  WITH CHECK (
+    payment_status = 'pending'
+    AND stripe_session_id IS NULL
+    AND ticket_count > 0
+    AND amount > 0
+    AND name IS NOT NULL
+    AND email IS NOT NULL
+  );
 
 -- Policy: Allow reads for authenticated users only (admin viewing)
 CREATE POLICY "Allow authenticated reads" ON orders

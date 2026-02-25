@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 import { TICKET_TIERS } from "@/lib/types";
 
@@ -9,13 +8,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const VENMO_USERNAME = "Sir-Pork-A-Lot";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { name, email, phone, ticketCount, amount } = body;
 
     // Validate input
-    if (!name || !email || !phone || !ticketCount || !amount) {
+    if (!name || !phone || !ticketCount || !amount) {
       return NextResponse.json(
         { error: "All fields are required" },
         { status: 400 }
@@ -33,19 +34,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create order in Supabase with "pending" status
-    const { data: order, error: dbError } = await supabase
-      .from("orders")
-      .insert({
-        name,
-        email,
-        phone,
-        ticket_count: ticketCount,
-        amount,
-        payment_status: "pending",
-      })
-      .select()
-      .single();
+    // Create pending order in Supabase
+    const { error: dbError } = await supabase.from("orders").insert({
+      name,
+      email: email || null,
+      phone,
+      ticket_count: ticketCount,
+      amount,
+      payment_status: "pending",
+    });
 
     if (dbError) {
       console.error("Supabase error:", dbError);
@@ -55,41 +52,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create Stripe Checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      customer_email: email,
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Raffle Ticket${ticketCount > 1 ? "s" : ""} — Team Sir Pork a Lot`,
-              description: `${ticketCount} raffle ticket${ticketCount > 1 ? "s" : ""} for Hogs for the Cause 2026`,
-            },
-            unit_amount: amount,
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `${req.nextUrl.origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.nextUrl.origin}/?cancelled=true`,
-      metadata: {
-        order_id: order.id,
-        name,
-        phone,
-        ticket_count: ticketCount.toString(),
-      },
-    });
+    // Build pre-populated Venmo deep link
+    const amountDollars = (amount / 100).toFixed(2);
+    const note = encodeURIComponent(
+      `Hogs for the Cause 2026 - ${ticketCount} Raffle Ticket${
+        ticketCount > 1 ? "s" : ""
+      } (${name})`
+    );
+    const venmoUrl = `https://venmo.com/${VENMO_USERNAME}?txn=pay&amount=${amountDollars}&note=${note}`;
 
-    // Update order with stripe session ID
-    await supabase
-      .from("orders")
-      .update({ stripe_session_id: session.id })
-      .eq("id", order.id);
+    // Redirect to success page with order details in query params
+    const successUrl = `/success?amount=${amount}&tickets=${ticketCount}&name=${encodeURIComponent(
+      name
+    )}&venmo=${encodeURIComponent(venmoUrl)}`;
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: successUrl });
   } catch (err) {
     console.error("Checkout error:", err);
     return NextResponse.json(
