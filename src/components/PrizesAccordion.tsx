@@ -5,13 +5,13 @@ import { useState } from "react";
 const prizes = [
   { icon: "🚗", name: "Vivid EV V4L Golf Cart" },
   { icon: "🍕", name: "Ooni Pizza Oven" },
-  { icon: "🏙️", name: "Warehouse District Penthouse & Best GC – Weekend Stay" },
+  { icon: "🏙️", name: "Warehouse District Penthouse & Besh GC – Weekend Stay" },
   { icon: "🏝️", name: "3 Night Stay at Grand Isle – Bayside" },
   { icon: "🧊", name: "Yeti Haul" },
   { icon: "🥤", name: "Yeti Soft Cooler + Tumblers" },
   { icon: "🔊", name: "Turtlebox Speaker" },
   { icon: "🥩", name: "McCord's Gift Card + Cutting Board" },
-  { icon: "🎁", name: "Martin's Gift Card, Lola Blanket + Hays Home Malone Door Sign" },
+  { icon: "🎁", name: "Martin's Gift Card, Lola Blanket + Hogs for the Cause door hanger by Home Malone" },
 ];
 
 export default function PrizesAccordion() {
