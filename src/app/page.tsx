@@ -18,7 +18,7 @@ export default function Home() {
                 alt="Sir Pork-a-Lot"
                 width={240}
                 height={240}
-                className="rounded-full mix-blend-screen drop-shadow-[0_0_45px_rgba(255,0,204,0.7)]"
+                className="mix-blend-screen drop-shadow-[0_0_45px_rgba(255,0,204,0.7)]"
                 priority
               />
             </div>
