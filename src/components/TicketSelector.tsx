@@ -28,16 +28,16 @@ export default function TicketSelector({
         >
           {/* Savings badge */}
           {tier.savings && (
-            <span className="absolute -top-3 -right-2 bg-gradient-to-r from-[#823530] to-[#9A3D36] text-[#E8D8BC] text-xs font-bold px-3 py-1 rounded-full">
+            <span className="absolute -top-3 -right-2 bg-gradient-to-r from-[#cc00aa] to-[#ff00cc] text-white text-xs font-bold px-3 py-1 rounded-full shadow-[0_0_12px_rgba(255,0,204,0.6)]">  
               {tier.savings}
             </span>
           )}
 
           <div className="flex justify-between items-center mb-2">
-            <span className="text-xl font-bold text-[#823530]">
+            <span className="text-xl font-bold text-[#ff00cc]">
               {tier.label}
             </span>
-            <span className="text-2xl font-extrabold text-[#1E3050]">
+            <span className="text-2xl font-extrabold text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)]">
               {formatPrice(tier.price)}
             </span>
           </div>
@@ -48,7 +48,7 @@ export default function TicketSelector({
           {selected?.count === tier.count && (
             <div className="absolute top-3 left-3">
               <svg
-                className="w-6 h-6 text-[#823530]"
+                className="w-6 h-6 text-[#00e5ff]"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >

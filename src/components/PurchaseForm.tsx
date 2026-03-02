@@ -52,12 +52,12 @@ export default function PurchaseForm() {
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Contact Info */}
       <div className="space-y-4">
-        <h3 className="text-xl font-bold text-[#823530] flex items-center gap-2">
+        <h3 className="text-xl font-bold text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)] flex items-center gap-2">
           <span className="text-2xl">📋</span> Your Information
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="name" className="block text-sm mb-1 text-[#2B3E5C]/70">
+            <label htmlFor="name" className="block text-sm mb-1 text-[#a78bca]">
               Full Name *
             </label>
             <input
@@ -71,7 +71,7 @@ export default function PurchaseForm() {
             />
           </div>
           <div>
-            <label htmlFor="phone" className="block text-sm mb-1 text-[#2B3E5C]/70">
+            <label htmlFor="phone" className="block text-sm mb-1 text-[#a78bca]">
               Phone Number *
             </label>
             <input
@@ -86,7 +86,7 @@ export default function PurchaseForm() {
           </div>
         </div>
         <div>
-          <label htmlFor="email" className="block text-sm mb-1 text-[#2B3E5C]/70">
+          <label htmlFor="email" className="block text-sm mb-1 text-[#a78bca]">
             Email Address (optional)
           </label>
           <input
@@ -102,7 +102,7 @@ export default function PurchaseForm() {
 
       {/* Ticket Selection */}
       <div className="space-y-4">
-        <h3 className="text-xl font-bold text-[#823530] flex items-center gap-2">
+        <h3 className="text-xl font-bold text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.5)] flex items-center gap-2">
           <span className="text-2xl">🎟️</span> Select Your Tickets
         </h3>
         <TicketSelector selected={selectedTier} onSelect={setSelectedTier} />
@@ -118,9 +118,9 @@ export default function PurchaseForm() {
       {/* Submit */}
       <div className="text-center">
         {selectedTier && (
-          <p className="text-lg mb-4 text-[#2B3E5C]/80">
+          <p className="text-lg mb-4 text-[#a78bca]">
             Total:{" "}
-            <span className="text-2xl font-bold text-[#823530]">
+            <span className="text-2xl font-bold text-[#ffd700] drop-shadow-[0_0_8px_rgba(255,215,0,0.6)]">
               ${(selectedTier.price / 100).toFixed(0)}
             </span>{" "}
             for {selectedTier.count} ticket{selectedTier.count > 1 ? "s" : ""}

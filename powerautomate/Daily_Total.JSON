@@ -1,0 +1,170 @@
+{
+  "$schema": "https://power-automate-tools.local/flow-editor.json#",
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "connectionName": "shared-sharepointonl-a9c93ec6-c28b-42a5-8ce7-b653ecd72115",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "displayName": "SharePoint",
+      "iconUri": "https://conn-afd-prod-endpoint-bmc9bqahasf3grgk.b01.azurefd.net/v1.0.1769/1.0.1769.4352/sharepointonline/icon.png",
+      "brandColor": "",
+      "tier": "Standard",
+      "apiName": "sharepointonline",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    },
+    "shared_teams": {
+      "connectionName": "shared-teams-85620b65-dda7-40df-976a-10f0e499ebe9",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_teams",
+      "displayName": "Microsoft Teams",
+      "iconUri": "https://conn-afd-prod-endpoint-bmc9bqahasf3grgk.b01.azurefd.net/releases/v1.0.1795/1.0.1795.4870/teams/icon.png",
+      "brandColor": "",
+      "tier": "Standard",
+      "apiName": "teams",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    }
+  },
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": {
+        "defaultValue": {},
+        "type": "Object"
+      },
+      "$authentication": {
+        "defaultValue": {},
+        "type": "SecureObject"
+      }
+    },
+    "triggers": {
+      "Recurrence": {
+        "recurrence": {
+          "frequency": "Day",
+          "interval": 1,
+          "timeZone": "Central Standard Time",
+          "startTime": "2025-04-04T15:00:00.000Z"
+        },
+        "evaluatedRecurrence": {
+          "frequency": "Day",
+          "interval": 1,
+          "timeZone": "Central Standard Time",
+          "startTime": "2025-04-04T15:00:00.000Z"
+        },
+        "metadata": {
+          "operationMetadataId": "22b407c2-5091-4611-8027-d75eb65c4e14"
+        },
+        "type": "Recurrence"
+      }
+    },
+    "actions": {
+      "Get_items": {
+        "runAfter": {},
+        "metadata": {
+          "operationMetadataId": "f34be36f-b42a-4519-abb0-7ca19d6fd37c"
+        },
+        "type": "OpenApiConnection",
+        "inputs": {
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "connectionName": "shared_sharepointonline",
+            "operationId": "GetItems"
+          },
+          "parameters": {
+            "dataset": "https://kingsofcode.sharepoint.com/sites/StevieCopilot",
+            "table": "c42c872a-510e-47d1-818a-1f55e0a96f4e",
+            "$filter": "SubmissionDate ge '@{utcNow('yyyy')}-01-01T00:00:00Z' and SubmissionDate lt '@{string(add(int(utcNow('yyyy')), 1))}-01-01T00:00:00Z'"
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runtimeConfiguration": {
+          "paginationPolicy": {
+            "minimumItemCount": 5000
+          }
+        }
+      },
+      "Initialize_variable": {
+        "runAfter": {
+          "Get_items": [
+            "Succeeded"
+          ]
+        },
+        "metadata": {
+          "operationMetadataId": "262224d8-a7e2-4dc2-a2a4-e5a31d1af675"
+        },
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "varTotal",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        }
+      },
+      "Apply_to_each": {
+        "foreach": "@outputs('Get_items')?['body/value']",
+        "actions": {
+          "Compose": {
+            "runAfter": {},
+            "metadata": {
+              "operationMetadataId": "3b8acbf2-d938-439c-9682-fb5fae8d80b1"
+            },
+            "type": "Compose",
+            "inputs": "@add(variables('varTotal'), items('Apply_to_each')?['TotalPaid'])"
+          },
+          "Set_variable": {
+            "runAfter": {
+              "Compose": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "1ba82818-853f-4c0a-89ef-156e3b49fb64"
+            },
+            "type": "SetVariable",
+            "inputs": {
+              "name": "varTotal",
+              "value": "@outputs('Compose')"
+            }
+          }
+        },
+        "runAfter": {
+          "Initialize_variable": [
+            "Succeeded"
+          ]
+        },
+        "metadata": {
+          "operationMetadataId": "dacb5b01-ae5b-4828-a007-7e40b6f4f969"
+        },
+        "type": "Foreach"
+      },
+      "Post_message_in_a_chat_or_channel": {
+        "runAfter": {
+          "Apply_to_each": [
+            "Succeeded"
+          ]
+        },
+        "metadata": {
+          "operationMetadataId": "fce352f5-4add-42d8-8a20-c6b581d6fd8b"
+        },
+        "type": "OpenApiConnection",
+        "inputs": {
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams",
+            "connectionName": "shared_teams",
+            "operationId": "PostMessageToConversation"
+          },
+          "parameters": {
+            "poster": "Flow bot",
+            "location": "Chat with Flow bot",
+            "body/recipient": "Stevie@StevieCoPilot.com;",
+            "body/messageBody": "<p>🐷 <strong>Hogs Raffle Update:</strong></p>\n<p><strong>Ticket Sales Total: </strong><span style=\"color:#228B22; font-size:1.2em;\">@{concat('$', formatNumber(variables('varTotal'), '##,##0'))}</span></p>\n"
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      }
+    }
+  }
+}
