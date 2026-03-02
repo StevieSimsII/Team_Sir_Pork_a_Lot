@@ -16,9 +16,9 @@ export default function Home() {
               <Image
                 src="/Photo_2.jpeg"
                 alt="Sir Pork-a-Lot"
-                width={220}
-                height={220}
-                className="drop-shadow-[0_0_35px_rgba(255,0,204,0.55)]"
+                width={240}
+                height={240}
+                className="rounded-full mix-blend-screen drop-shadow-[0_0_45px_rgba(255,0,204,0.7)]"
                 priority
               />
             </div>
@@ -47,7 +47,7 @@ export default function Home() {
 
         {/* Purchase Form Section */}
         <section className="max-w-2xl mx-auto px-4 pb-16 pt-4">
-          <div className="bg-[#1a0f35]/60 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-[#c084fc]/20 shadow-[0_0_40px_rgba(192,132,252,0.1)]">
+          <div className="bg-[#1a0f35]/60 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-[#c084fc]/50 shadow-[0_0_40px_rgba(192,132,252,0.25),inset_0_0_40px_rgba(192,132,252,0.04)]">
             <PurchaseForm />
           </div>
         </section>
