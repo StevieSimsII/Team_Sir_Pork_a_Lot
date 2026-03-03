@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const prizes = [
   { icon: "🚗", name: "Vivid EV V4L Golf Cart" },
-  { icon: "🍕", name: "Ooni Pizza Oven" },
+  { icon: "🍕", name: "Ooni Karu 2 Pro Multi Fuel Pizza Oven" },
   { icon: "🏙️", name: "Warehouse District Penthouse & Besh GC – Weekend Stay" },
   { icon: "🏝️", name: "3 Night Stay at Grand Isle – Bayside" },
   { icon: "🧊", name: "Yeti Haul" },
