@@ -58,7 +58,6 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
             {/* Venmo CTA Button */}
             <a
               href={venmoUrl}
-              target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-3 bg-[#3D95CE] hover:bg-[#2d7faf] active:bg-[#2370a0] text-white font-bold text-lg px-8 py-4 rounded-2xl transition-colors w-full mb-4 shadow-lg"
             >
