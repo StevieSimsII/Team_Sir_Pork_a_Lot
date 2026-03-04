@@ -1,0 +1,46 @@
+name: Generate Raffle Dashboard
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  push:
+    branches: [main]
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  build-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate dashboard
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SHAREPOINT_HOSTNAME: kingsofcode.sharepoint.com
+          SHAREPOINT_SITE_PATH: /sites/StevieCopilot
+          SHAREPOINT_LIST_ID: c42c872a-510e-47d1-818a-1f55e0a96f4e
+          GOAL_AMOUNT: "30000"
+        run: python dashboard/generate.py
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dashboard/dist
+          publish_branch: gh-pages
+          force_orphan: true
