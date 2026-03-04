@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from collections import defaultdict
 
 import requests
@@ -128,7 +129,7 @@ def process(items: list[dict]) -> dict:
         "goal":          GOAL,
         "pct":           min(100, round(total_raised / GOAL * 100, 1)),
         "year":          CURRENT_YEAR,
-        "updated_at":    datetime.now(timezone.utc).strftime("%B %d, %Y %I:%M %p UTC"),
+        "updated_at":    datetime.now(ZoneInfo("America/Chicago")).strftime("%B %d, %Y %I:%M %p %Z"),
     }
 
 # ── HTML generation ───────────────────────────────────────────────────────────
