@@ -120,7 +120,6 @@ def process(items: list[dict]) -> dict:
         "total_raised":  total_raised,
         "total_tickets": total_tickets,
         "buyer_count":   len(buyers),
-        "avg_order":     total_raised / len(buyers) if buyers else 0,
         "daily_labels":  sorted_days,
         "daily_values":  [daily_totals[d] for d in sorted_days],
         "tier_labels":   [t[0] for t in tiers],
@@ -353,11 +352,7 @@ def render_html(d: dict) -> str:
       <div class="card-label">👥 Total Buyers</div>
       <div class="card-value purp">{d['buyer_count']}</div>
     </div>
-    <div class="card">
-      <div class="card-label">📊 Avg Order</div>
-      <div class="card-value pink">${d['avg_order']:,.0f}</div>
-    </div>
-  </div>
+</div>
 
   <!-- Goal progress -->
   <div class="goal-card">
