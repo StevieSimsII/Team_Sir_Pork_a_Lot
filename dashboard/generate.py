@@ -49,22 +49,31 @@ def get_site_id(token: str) -> str:
     return data["id"]
 
 def get_list_items(token: str, site_id: str) -> list[dict]:
-    """Fetch all current-year items with pagination."""
-    year_start = f"{CURRENT_YEAR}-01-01T00:00:00Z"
-    year_end   = f"{CURRENT_YEAR + 1}-01-01T00:00:00Z"
-    filter_q   = f"fields/SubmissionDate ge '{year_start}' and fields/SubmissionDate lt '{year_end}'"
+    """Fetch all items with pagination, then filter to current year in Python.
+    
+    Graph API OData $filter on SharePoint list fields is unreliable,
+    so we pull everything and filter locally.
+    """
     url = (
         f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{LIST_ID}/items"
-        f"?$expand=fields"
-        f"&$filter={requests.utils.quote(filter_q)}"
-        f"&$top=999"
+        f"?$expand=fields&$top=999"
     )
-    items = []
+    all_items = []
     while url:
         data = graph(token, url)
-        items.extend(data.get("value", []))
+        all_items.extend(data.get("value", []))
         url = data.get("@odata.nextLink")
-    return items
+
+    # Filter to current year by SubmissionDate
+    year_prefix = str(CURRENT_YEAR)
+    filtered = []
+    for item in all_items:
+        date_str = item.get("fields", {}).get("SubmissionDate", "") or ""
+        if date_str.startswith(year_prefix):
+            filtered.append(item)
+
+    print(f"  Total items in list: {len(all_items)}, current year ({CURRENT_YEAR}): {len(filtered)}")
+    return filtered
 
 # ── Processing ────────────────────────────────────────────────────────────────
 
@@ -452,7 +461,6 @@ def main():
 
     print(f"Fetching {CURRENT_YEAR} list items...")
     items = get_list_items(token, site_id)
-    print(f"  Found {len(items)} items")
 
     print("Processing data...")
     data = process(items)
