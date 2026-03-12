@@ -24,6 +24,9 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # ── Config from environment ───────────────────────────────────────────────────
 
@@ -390,7 +393,194 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
         "rows_returning":        "".join(ret_row(b) for b in returning) or EMPTY_RET,
         "rows_prospects":        "".join(pro_row(b) for b in prospects) or EMPTY_PRO,
         "rows_new":              "".join(new_row(b) for b in new_buyers) or EMPTY_NEW,
+        # Raw buyer lists (for Excel export)
+        "_returning":            returning,
+        "_prospects":            prospects,
+        "_new_buyers":           new_buyers,
+        "_top5":                 top5,
+        "_daily_labels":         sorted_days,
+        "_daily_values":         [daily_totals[d] for d in sorted_days],
     }
+
+# ── Excel export ─────────────────────────────────────────────────────────────
+
+def write_excel(d: dict, out_dir: str) -> str:
+    """Write a multi-sheet Excel workbook and return its path."""
+    wb = openpyxl.Workbook()
+
+    # ── Shared styles ──────────────────────────────────────────────────────────
+    DARK  = "1A0F35"
+    CYAN  = "00B4CC"
+    GOLD  = "C8A800"
+    PURP  = "7C3AED"
+    GREEN = "16A34A"
+    WHITE = "F0E6FF"
+    GREY  = "A78BCA"
+    LIGHT = "2D1B5E"
+
+    def hdr_font(color=WHITE):       return Font(bold=True, color=color, size=11)
+    def cell_font(color=WHITE):      return Font(color=color, size=10)
+    def hdr_fill(hex_color=DARK):    return PatternFill("solid", fgColor=hex_color)
+    def thin_border():
+        s = Side(style="thin", color="3D2870")
+        return Border(left=s, right=s, top=s, bottom=s)
+    def money(ws, cell, val):
+        ws[cell] = val
+        ws[cell].number_format = '$#,##0.00'
+        ws[cell].font = cell_font(CYAN)
+        ws[cell].alignment = Alignment(horizontal="right")
+    def pct_cell(ws, cell, val):
+        ws[cell] = val / 100
+        ws[cell].number_format = '0.0%'
+        ws[cell].font = cell_font(GOLD)
+        ws[cell].alignment = Alignment(horizontal="right")
+
+    def write_header_row(ws, headers: list[tuple[str,int,str]]):
+        """headers = list of (label, col_width, hex_color)"""
+        for col_idx, (label, width, color) in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx, value=label)
+            cell.font = hdr_font(WHITE)
+            cell.fill = PatternFill("solid", fgColor=LIGHT)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = thin_border()
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+        ws.row_dimensions[1].height = 22
+        ws.freeze_panes = "A2"
+
+    def style_data_row(ws, row: int, n_cols: int, alt: bool = False):
+        bg = "1F1042" if alt else DARK
+        for c in range(1, n_cols + 1):
+            cell = ws.cell(row=row, column=c)
+            cell.fill = PatternFill("solid", fgColor=bg)
+            cell.border = thin_border()
+            if not cell.font or cell.font.color.rgb in ("FF000000", "00000000"):
+                cell.font = cell_font(WHITE)
+
+    # ── Sheet 1: Summary ───────────────────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = "Summary"
+    ws1.sheet_properties.tabColor = PURP
+    ws1.sheet_view.showGridLines = False
+
+    summary_rows = [
+        ("Metric",                                  "Value"),
+        (f"{d['year']} Total Raised",               f"${d['total_raised']:,.0f}"),
+        (f"{d['year']} Tickets Sold",               d['total_tickets']),
+        (f"{d['year']} Total Buyers",               d['buyer_count']),
+        (f"Goal (${d['goal']:,})",                  f"{d['pct']}%"),
+        ("", ""),
+        (f"{d['prev_year']} Revenue (through {d['same_day_prev']})", f"${d['todate_prev_amt']:,.0f}"),
+        (f"{d['prev_year']} Tickets (through {d['same_day_prev']})", d['todate_prev_tix']),
+        (f"{d['prev_year']} Buyers (through {d['same_day_prev']})",  d['todate_prev_buyers']),
+        (f"YoY Revenue Change (through {d['today']})", f"{'+' if d['pct_diff'] >= 0 else ''}{d['pct_diff']}%"),
+        ("", ""),
+        (f"Returning Buyers ({d['prev_year']} → {d['year']})", d['n_returning']),
+        ("Retention Rate",                           f"{d['ret_rate']}%"),
+        (f"Prospects (2025 buyers not yet in {d['year']})", d['n_prospects']),
+        (f"New Buyers (first-timers in {d['year']})",d['n_new']),
+        ("", ""),
+        ("Report Generated",                         d['updated_at']),
+    ]
+    ws1.column_dimensions["A"].width = 46
+    ws1.column_dimensions["B"].width = 22
+    for r_idx, (label, value) in enumerate(summary_rows, 1):
+        ca = ws1.cell(row=r_idx, column=1, value=label)
+        cb = ws1.cell(row=r_idx, column=2, value=value)
+        bg = LIGHT if r_idx == 1 else ("1F1042" if r_idx % 2 == 0 else DARK)
+        for c in (ca, cb):
+            c.fill = PatternFill("solid", fgColor=bg)
+            c.border = thin_border()
+            c.alignment = Alignment(vertical="center")
+        if r_idx == 1:
+            ca.font = hdr_font(); cb.font = hdr_font(CYAN)
+        else:
+            ca.font = cell_font(GREY); cb.font = cell_font(GOLD if str(value).endswith("%") else CYAN)
+
+    # ── Sheet 2: Returning Buyers ──────────────────────────────────────────────
+    ws2 = wb.create_sheet("Returning Buyers")
+    ws2.sheet_properties.tabColor = GREEN
+    ws2.sheet_view.showGridLines = False
+    headers2 = [
+        ("Name", 30, WHITE),
+        ("Email", 32, WHITE),
+        ("Phone", 16, WHITE),
+        (f"{d['prev_year']} Tickets", 14, WHITE),
+        (f"{d['prev_year']} Paid", 14, WHITE),
+        (f"{d['year']} Tickets", 14, WHITE),
+        (f"{d['year']} Paid", 14, WHITE),
+    ]
+    write_header_row(ws2, headers2)
+    for r_i, b in enumerate(d["_returning"], 2):
+        ws2.cell(r_i, 1, b.name).font       = cell_font(WHITE)
+        ws2.cell(r_i, 2, b.email).font      = cell_font(CYAN)
+        ws2.cell(r_i, 3, b.phone).font      = cell_font(WHITE)
+        ws2.cell(r_i, 4, b.tickets_prev or 0).font = cell_font(GREY)
+        money(ws2, f"E{r_i}", b.amount_prev)
+        ws2.cell(r_i, 6, b.tickets_cur or 0).font  = cell_font(WHITE)
+        money(ws2, f"G{r_i}", b.amount_cur)
+        ws2[f"G{r_i}"].font = cell_font(CYAN)
+        style_data_row(ws2, r_i, 7, alt=(r_i % 2 == 0))
+
+    # ── Sheet 3: Prospects ─────────────────────────────────────────────────────
+    ws3 = wb.create_sheet("Prospects")
+    ws3.sheet_properties.tabColor = GOLD
+    ws3.sheet_view.showGridLines = False
+    headers3 = [
+        ("Name", 30, WHITE),
+        ("Email", 32, WHITE),
+        ("Phone", 16, WHITE),
+        (f"{d['prev_year']} Tickets", 14, WHITE),
+        (f"{d['prev_year']} Paid", 14, WHITE),
+    ]
+    write_header_row(ws3, headers3)
+    for r_i, b in enumerate(d["_prospects"], 2):
+        ws3.cell(r_i, 1, b.name).font   = cell_font(WHITE)
+        ws3.cell(r_i, 2, b.email).font  = cell_font(CYAN)
+        ws3.cell(r_i, 3, b.phone).font  = cell_font(WHITE)
+        ws3.cell(r_i, 4, b.tickets_prev or 0).font = cell_font(GREY)
+        money(ws3, f"E{r_i}", b.amount_prev)
+        style_data_row(ws3, r_i, 5, alt=(r_i % 2 == 0))
+
+    # ── Sheet 4: New Buyers ────────────────────────────────────────────────────
+    ws4 = wb.create_sheet("New Buyers")
+    ws4.sheet_properties.tabColor = "CC00AA"
+    ws4.sheet_view.showGridLines = False
+    headers4 = [
+        ("Name", 30, WHITE),
+        ("Email", 32, WHITE),
+        ("Phone", 16, WHITE),
+        (f"{d['year']} Tickets", 14, WHITE),
+        (f"{d['year']} Paid", 14, WHITE),
+    ]
+    write_header_row(ws4, headers4)
+    for r_i, b in enumerate(d["_new_buyers"], 2):
+        ws4.cell(r_i, 1, b.name).font   = cell_font(WHITE)
+        ws4.cell(r_i, 2, b.email).font  = cell_font(CYAN)
+        ws4.cell(r_i, 3, b.phone).font  = cell_font(WHITE)
+        ws4.cell(r_i, 4, b.tickets_cur or 0).font = cell_font(WHITE)
+        money(ws4, f"E{r_i}", b.amount_cur)
+        ws4[f"E{r_i}"].font = cell_font(CYAN)
+        style_data_row(ws4, r_i, 5, alt=(r_i % 2 == 0))
+
+    # ── Sheet 5: Daily Sales ───────────────────────────────────────────────────
+    ws5 = wb.create_sheet("Daily Sales")
+    ws5.sheet_properties.tabColor = CYAN
+    ws5.sheet_view.showGridLines = False
+    headers5 = [("Date", 14, WHITE), ("Daily Revenue", 18, WHITE), ("Cumulative Revenue", 20, WHITE)]
+    write_header_row(ws5, headers5)
+    running = 0.0
+    for r_i, (day, val) in enumerate(zip(d["_daily_labels"], d["_daily_values"]), 2):
+        running += val
+        ws5.cell(r_i, 1, day).font = cell_font(GREY)
+        money(ws5, f"B{r_i}", val)
+        money(ws5, f"C{r_i}", running)
+        ws5[f"C{r_i}"].font = cell_font(CYAN)
+        style_data_row(ws5, r_i, 3, alt=(r_i % 2 == 0))
+
+    out_path = os.path.join(out_dir, f"raffle_report_{d['year']}.xlsx")
+    wb.save(out_path)
+    return out_path
+
 
 # ── HTML generation ───────────────────────────────────────────────────────────
 
@@ -1085,6 +1275,10 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"  Saved to {out_path}")
+
+    print("Writing Excel report...")
+    xlsx_path = write_excel(data, out_dir)
+    print(f"  Saved to {xlsx_path}")
 
 if __name__ == "__main__":
     try:
