@@ -294,25 +294,41 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
     prospects.sort(key=lambda b: b.amount_prev, reverse=True)
     new_buyers.sort(key=lambda b: b.amount_cur, reverse=True)
 
-    # ── Cumulative chart (MM-DD aligned) ──────────────────────────────────────
-    master_labels: list[str] = []
+    # ── Cumulative chart (MM-DD aligned, trimmed to active sales window) ───────
+    # Build the full 365-label axis first, then crop to the active window so
+    # the dead gap between last year's final sale and this year's opening day
+    # is removed from the chart x-axis.
+    all_labels: list[str] = []
     _d = date(2001, 1, 1)
     while _d.year == 2001:
-        master_labels.append(_d.strftime("%m-%d"))
+        all_labels.append(_d.strftime("%m-%d"))
         _d += timedelta(days=1)
     today_mmdd = TODAY.strftime("%m-%d")
 
-    def build_cumul(daily: dict, year: int, cap: str | None) -> list:
+    def build_cumul(daily: dict, year: int, labels: list[str], cap: str | None) -> list:
         out = []; running = 0.0
-        for mmdd in master_labels:
+        for mmdd in labels:
             if cap and mmdd > cap:
                 out.append(None); continue
             running += daily.get(f"{year}-{mmdd}", 0.0)
             out.append(round(running, 2))
         return out
 
-    chart_prev = build_cumul(daily_prev, PREV_YEAR, None)
-    chart_cur  = build_cumul(daily_cur,  CURRENT_YEAR, today_mmdd)
+    # Determine the active window across both years
+    prev_days_with_sales = [k[5:] for k in daily_prev if daily_prev[k] > 0]  # MM-DD
+    cur_days_with_sales  = [k[5:] for k in daily_cur  if daily_cur[k]  > 0]
+    window_start = min(
+        (min(prev_days_with_sales) if prev_days_with_sales else today_mmdd),
+        (min(cur_days_with_sales)  if cur_days_with_sales  else today_mmdd),
+    )
+    window_end = max(
+        (max(prev_days_with_sales) if prev_days_with_sales else today_mmdd),
+        today_mmdd,
+    )
+    master_labels = [l for l in all_labels if window_start <= l <= window_end]
+
+    chart_prev = build_cumul(daily_prev, PREV_YEAR,    master_labels, None)
+    chart_cur  = build_cumul(daily_cur,  CURRENT_YEAR, master_labels, today_mmdd)
 
     # ── HTML table rows ───────────────────────────────────────────────────────
     def _email_link(e):
