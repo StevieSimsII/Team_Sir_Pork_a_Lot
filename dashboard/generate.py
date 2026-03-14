@@ -314,17 +314,21 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
             out.append(round(running, 2))
         return out
 
-    # Determine the active window across both years
+    # Determine the active window across both years.
+    # The raffle event is always around April 10-11, so the season always ends
+    # by "04-11" regardless of whether all sales data has arrived yet.
+    EVENT_END_MMDD = "04-11"
+
     prev_days_with_sales = [k[5:] for k in daily_prev if daily_prev[k] > 0]  # MM-DD
     cur_days_with_sales  = [k[5:] for k in daily_cur  if daily_cur[k]  > 0]
     window_start = min(
         (min(prev_days_with_sales) if prev_days_with_sales else today_mmdd),
         (min(cur_days_with_sales)  if cur_days_with_sales  else today_mmdd),
     )
-    window_end = max(
-        (max(prev_days_with_sales) if prev_days_with_sales else today_mmdd),
-        today_mmdd,
-    )
+    # Always extend the axis to the event end date so both lines are compared
+    # over the full season. Cap the current-year line at today so it doesn't
+    # show a flat run into the future.
+    window_end = EVENT_END_MMDD
     master_labels = [l for l in all_labels if window_start <= l <= window_end]
 
     chart_prev = build_cumul(daily_prev, PREV_YEAR,    master_labels, None)
