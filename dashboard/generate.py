@@ -171,8 +171,10 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
     daily_cur: dict[str, float] = defaultdict(float)
 
     for f in cur_fields:
-        amount  = float(f.get("TotalPaid", 0) or 0)
         tickets = int(f.get("NumberofChances", 0) or 0)
+        if tickets == 0:
+            continue
+        amount  = float(f.get("TotalPaid", 0) or 0)
         person  = str(f.get("Person", "Unknown") or "Unknown").strip()
         email   = str(f.get("Email", "") or "").strip()
         phone   = str(f.get("Phone", "") or "").strip()
