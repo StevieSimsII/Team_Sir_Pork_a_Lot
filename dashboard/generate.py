@@ -144,11 +144,14 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
     # ── Bucket items by year (Hogs_For_the_Cause only) ─────────────────────
     cur_fields:  list[dict] = []
     prev_fields: list[dict] = []
+    # Debug: show all unique RaffleName values before filtering
+    unique_raffles = {(item.get("fields") or {}).get("RaffleName") for item in all_items}
+    print(f"  Unique RaffleName values in list: {sorted(str(r) for r in unique_raffles)}")
     for item in all_items:
         f      = item.get("fields", {})
         raffle = (f.get("RaffleName") or "").strip()
-        # Backfill complete — all items are stamped; exclude anything not Hogs.
-        if raffle != "Hogs_For_the_Cause":
+        # Case-insensitive match to handle any casing in SharePoint
+        if raffle.lower() != "hogs_for_the_cause":
             continue
         yr = (f.get("SubmissionDate") or "")[:4]
         if yr == str(CURRENT_YEAR):
