@@ -1,0 +1,337 @@
+{
+  "$schema": "https://power-automate-tools.local/flow-editor.json#",
+  "connectionReferences": {
+    "shared_conversionservice": {
+      "connectionReferenceLogicalName": "ss_sharedconversionservice_e3b25",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_conversionservice",
+      "displayName": "Content Conversion",
+      "iconUri": "https://conn-afd-prod-endpoint-bmc9bqahasf3grgk.b01.azurefd.net/v1.0.1767/1.0.1767.4341/conversionservice/icon.png",
+      "brandColor": "#4f6bed",
+      "tier": "Standard",
+      "apiName": "conversionservice",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    },
+    "shared_sharepointonline": {
+      "connectionReferenceLogicalName": "ss_sharedsharepointonline_82f55",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "displayName": "SharePoint",
+      "iconUri": "https://conn-afd-prod-endpoint-bmc9bqahasf3grgk.b01.azurefd.net/v1.0.1769/1.0.1769.4352/sharepointonline/icon.png",
+      "brandColor": "",
+      "tier": "Standard",
+      "apiName": "sharepointonline",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    },
+    "shared_teams": {
+      "connectionReferenceLogicalName": "new_sharedteams_14723",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_teams",
+      "displayName": "Microsoft Teams",
+      "iconUri": "https://conn-afd-prod-endpoint-bmc9bqahasf3grgk.b01.azurefd.net/releases/v1.0.1795/1.0.1795.4870/teams/icon.png",
+      "brandColor": "",
+      "tier": "Standard",
+      "apiName": "teams",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    },
+    "shared_office365": {
+      "connectionReferenceLogicalName": "ss_sharedoffice365_c79f2",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+      "displayName": "Office 365 Outlook",
+      "iconUri": "https://conn-afd-prod-endpoint-bmc9bqahasf3grgk.b01.azurefd.net/releases/v1.0.1788/1.0.1788.4524/office365/icon.png",
+      "brandColor": "#0078D4",
+      "tier": "Standard",
+      "apiName": "office365",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    }
+  },
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$connections": {
+        "defaultValue": {},
+        "type": "Object"
+      },
+      "$authentication": {
+        "defaultValue": {},
+        "type": "SecureObject"
+      }
+    },
+    "triggers": {
+      "When_a_new_email_arrives_(V3)": {
+        "splitOn": "@triggerOutputs()?['body/value']",
+        "metadata": {
+          "Id::AAMkAGQzMzc5MzE3LTc5MTUtNGI1Yy04MDUzLWNmZTk5MDE1MWY4ZgAuAAAAAADCNIlQmZ1sQ4sXrRPaRnMoAQCnp3FdU4rUS4rkA1Mf2ITKAACobOPVAAA=": "🐷 Hogs Venmo",
+          "operationMetadataId": "e70c2065-d492-4ce4-a737-c7afad95b494"
+        },
+        "type": "OpenApiConnectionNotification",
+        "inputs": {
+          "host": {
+            "connectionName": "shared_office365",
+            "operationId": "OnNewEmailV3",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+          },
+          "parameters": {
+            "folderPath": "Id::AAMkAGQzMzc5MzE3LTc5MTUtNGI1Yy04MDUzLWNmZTk5MDE1MWY4ZgAuAAAAAADCNIlQmZ1sQ4sXrRPaRnMoAQCnp3FdU4rUS4rkA1Mf2ITKAACobOPVAAA=",
+            "includeAttachments": true,
+            "importance": "Any",
+            "fetchOnlyWithAttachment": false
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      }
+    },
+    "actions": {
+      "Try": {
+        "actions": {
+          "Html_to_text": {
+            "runAfter": {},
+            "metadata": {
+              "operationMetadataId": "876d4b83-4ce8-45f0-a060-510471e5435c"
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_conversionservice",
+                "operationId": "HtmlToText",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_conversionservice"
+              },
+              "parameters": {
+                "Content": "<p>@{triggerOutputs()?['body/body']}</p>"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Compose": {
+            "runAfter": {
+              "Html_to_text": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "5020d9b2-8527-4d8e-a237-2abd6a5e05ca"
+            },
+            "type": "Compose",
+            "inputs": "@body('Html_to_text')"
+          },
+          "Compose_Name": {
+            "runAfter": {
+              "Compose": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "baa874fb-e995-43bb-862c-5fe21740d403"
+            },
+            "type": "Compose",
+            "inputs": "@trim(\r\n  first(\r\n    split(\r\n      last(split(string(body('HTML_to_Text')), 'Subject:')),\r\n      ' paid you '\r\n    )\r\n  )\r\n)\r\n"
+          },
+          "Compose_Subject": {
+            "runAfter": {
+              "Compose_Name": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "51cf27b3-4aa7-4bf9-9210-e19c0307ba54"
+            },
+            "type": "Compose",
+            "inputs": "@triggerOutputs()?['body/subject']"
+          },
+          "Clean_Subject": {
+            "runAfter": {
+              "Compose_Subject": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "a3b60c0d-b9b3-47b3-9d68-03992013f904"
+            },
+            "type": "Compose",
+            "inputs": "@trim(replace(triggerBody()?['Subject'], 'Fw: ', ''))\r\n"
+          },
+          "Compose_Amount": {
+            "runAfter": {
+              "Clean_Subject": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "11493a3b-9130-438d-869c-97f94af4d662"
+            },
+            "type": "Compose",
+            "inputs": "@trim(\r\n  last(\r\n    split(outputs('Clean_Subject'), ' paid you ')\r\n  )\r\n)\r\n"
+          },
+          "Compose_Transaction_ID": {
+            "runAfter": {
+              "Set_variable": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "b8afe12e-d797-4b1d-9ccb-3e5a40dc394c"
+            },
+            "type": "Compose",
+            "inputs": "@trim(\r\n  first(\r\n    split(\r\n      trim(\r\n        first(\r\n          split(\r\n            last(\r\n              split(string(body('HTML_to_Text')), 'TRANSACTION ID')\r\n            ),\r\n            'SENT TO'\r\n          )\r\n        )\r\n      ),\r\n      '\\n'\r\n    )\r\n  )\r\n)\r\n"
+          },
+          "Compose_Ticket_Count": {
+            "runAfter": {
+              "Compose_Transaction_ID": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "bb7dfe85-2cff-4ab1-9caa-fc4c3ba2ad03"
+            },
+            "type": "Compose",
+            "inputs": "@if(\r\n    equals(variables('Amount'), 25),\r\n    1,\r\n    if(\r\n        equals(variables('Amount'), 60),\r\n        3,\r\n        if(\r\n            equals(mod(variables('Amount'), 100), 0),\r\n            mul(div(variables('Amount'), 100), 6),\r\n            null\r\n        )\r\n    )\r\n)\r\n"
+          },
+          "Compose_Raffle_Detect": {
+            "runAfter": {
+              "Compose_Ticket_Count": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "r4ff1e-detect-0001-crna-hogs-split"
+            },
+            "type": "Compose",
+            "inputs": "@if(contains(string(body('HTML_to_Text')), 'CRNA_Essential_Bundle'), 'CRNA_Essential_Bundle', if(contains(string(body('HTML_to_Text')), 'Hogs for the Cause'), 'Hogs_For_the_Cause', 'Unknown'))"
+          },
+          "Create_item": {
+            "runAfter": {
+              "Compose_Raffle_Detect": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "baee283c-b735-4a37-8120-dd892f1e85ee"
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_sharepointonline",
+                "operationId": "PostItem",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+              },
+              "parameters": {
+                "dataset": "https://kingsofcode.sharepoint.com/sites/StevieCopilot",
+                "table": "c42c872a-510e-47d1-818a-1f55e0a96f4e",
+                "item/Title": "@triggerOutputs()?['body/subject']",
+                "item/Person": "@outputs('Compose_Name')",
+                "item/NumberofChances": "@outputs('Compose_Ticket_Count')",
+                "item/PaymentReferenceID": "@outputs('Compose_Transaction_ID')",
+                "item/TotalPaid": "@variables('Amount')",
+                "item/SubmissionDate": "@triggerOutputs()?['body/receivedDateTime']",
+                "item/EmailAddress": "@triggerOutputs()?['body/from']",
+                "item/RaffleName": "@outputs('Compose_Raffle_Detect')"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Post_message_in_a_chat_or_channel": {
+            "runAfter": {
+              "Create_item": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "984da932-aa46-42f7-989a-6d3753200551"
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_teams",
+                "operationId": "PostMessageToConversation",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams"
+              },
+              "parameters": {
+                "poster": "Flow bot",
+                "location": "Chat with Flow bot",
+                "body/recipient": "Stevie@StevieCoPilot.com;",
+                "body/messageBody": "<p>🎟️ <strong>Venmo Raffle Order Received</strong> 🎉🎟️<br><br>\n<strong>🎪 Raffle: </strong>@{outputs('Create_item')?['body/RaffleName']}<br>\n<strong>👤 Name: </strong>@{outputs('Create_item')?['body/Person']} <br>\n<strong>🎟️ Ticket Count:</strong> @{outputs('Create_item')?['body/NumberofChances']}<br>\n<strong>💵 Total Paid: $</strong>@{outputs('Create_item')?['body/TotalPaid']}<br>\n</p>\n"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Set_variable": {
+            "runAfter": {
+              "Compose_Amount": [
+                "Succeeded"
+              ]
+            },
+            "metadata": {
+              "operationMetadataId": "afbec74f-d97f-49a5-a299-906b7176e0ce"
+            },
+            "type": "SetVariable",
+            "inputs": {
+              "name": "Amount",
+              "value": "@int(float(trim(replace(outputs('Compose_Amount'), '$', ''))))\r\n"
+            }
+          }
+        },
+        "runAfter": {
+          "Initialize_variable": [
+            "Succeeded"
+          ]
+        },
+        "metadata": {
+          "operationMetadataId": "a5922c0c-c4ca-4703-bad9-ef03cb6099f7"
+        },
+        "type": "Scope"
+      },
+      "Initialize_variable": {
+        "runAfter": {},
+        "metadata": {
+          "operationMetadataId": "35b1261e-5342-445e-8905-e89553bb749b"
+        },
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "Amount",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        }
+      },
+      "Catch": {
+        "actions": {
+          "Post_message_in_a_chat_or_channel_if_Failed": {
+            "runAfter": {},
+            "metadata": {
+              "operationMetadataId": "a2961e59-743f-4597-b9bb-cc1485109343"
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_teams",
+                "operationId": "PostMessageToConversation",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams"
+              },
+              "parameters": {
+                "poster": "Flow bot",
+                "location": "Chat with Flow bot",
+                "body/recipient": "Stevie@StevieCoPilot.com;",
+                "body/messageBody": "<p>🐷🎟️ <strong>Venmo for Hogs Raffle Order Failed</strong> ⚠️🎟️<br><br>"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          }
+        },
+        "runAfter": {
+          "Try": [
+            "Failed"
+          ]
+        },
+        "metadata": {
+          "operationMetadataId": "b5d4105e-c587-4ced-b9b5-2a2128997005"
+        },
+        "type": "Scope"
+      }
+    }
+  }
+}

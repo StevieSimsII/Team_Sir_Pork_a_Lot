@@ -223,11 +223,15 @@ class Buyer:
 
 def process_data(sp_items: list[dict], csv_rows: list[dict]) -> dict:
 
-    # ── 1. Bucket SharePoint items by year ────────────────────────────────────
+    # ── 1. Bucket SharePoint items by year (Hogs_For_the_Cause only) ──────────
     sp25: list[dict] = []
     sp26: list[dict] = []
     for item in sp_items:
-        f  = item.get("fields", {})
+        f      = item.get("fields", {})
+        raffle = (f.get("RaffleName") or "").strip()
+        # Backfill complete — all items are stamped; exclude anything not Hogs.
+        if raffle != "Hogs_For_the_Cause":
+            continue
         yr = (f.get("SubmissionDate") or "")[:4]
         if yr == str(CUR_YEAR):
             sp26.append(f)

@@ -141,11 +141,15 @@ class Buyer:
 
 def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
 
-    # ── Bucket items by year ──────────────────────────────────────────────────
+    # ── Bucket items by year (Hogs_For_the_Cause only) ─────────────────────
     cur_fields:  list[dict] = []
     prev_fields: list[dict] = []
     for item in all_items:
-        f  = item.get("fields", {})
+        f      = item.get("fields", {})
+        raffle = (f.get("RaffleName") or "").strip()
+        # Backfill complete — all items are stamped; exclude anything not Hogs.
+        if raffle != "Hogs_For_the_Cause":
+            continue
         yr = (f.get("SubmissionDate") or "")[:4]
         if yr == str(CURRENT_YEAR):
             cur_fields.append(f)
