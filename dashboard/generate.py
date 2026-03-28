@@ -1101,7 +1101,7 @@ def render_html(report_data: dict[str, dict]) -> str:
       background: linear-gradient(90deg, #cc00aa, #ff00cc, #ffd700);
       box-shadow: 0 0 16px rgba(255,0,204,.5);
       transition: width .6s ease;
-      width: {d['pct']}%;
+      width: 0;
     }}
     .goal-sub {{
       display: flex;
