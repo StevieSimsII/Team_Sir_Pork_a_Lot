@@ -162,305 +162,291 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
   config = RAFFLE_CONFIGS[raffle_key]
   include_history = config["include_history"]
 
-  # ── Bucket items by year for the requested raffle ───────────────────────
   cur_fields: list[dict] = []
   prev_fields: list[dict] = []
   for item in all_items:
-    f = item.get("fields", {})
-    raffle = (f.get("RaffleName") or "").strip().lower()
+    fields = item.get("fields", {})
+    raffle = (fields.get("RaffleName") or "").strip().lower()
     if raffle != raffle_key:
       continue
-    yr = (f.get("SubmissionDate") or "")[:4]
-    if yr == str(CURRENT_YEAR):
-      cur_fields.append(f)
-    elif include_history and yr == str(PREV_YEAR):
-      prev_fields.append(f)
+    year = (fields.get("SubmissionDate") or "")[:4]
+    if year == str(CURRENT_YEAR):
+      cur_fields.append(fields)
+    elif include_history and year == str(PREV_YEAR):
+      prev_fields.append(fields)
+
   print(f"  {config['display_name']}: {len(cur_fields)} current-year items")
   if include_history:
     print(f"    {PREV_YEAR}: {len(prev_fields)} prior-year items")
 
-    # ── Helper ────────────────────────────────────────────────────────────────
-    def _key(email, phone, name):
-        e = norm_email(email)
-        p = norm_phone(phone)
-        n = norm_name(name)
-        return e if e else (p if p else n)
+  def _key(email: str, phone: str, name: str) -> str:
+    e = norm_email(email)
+    p = norm_phone(phone)
+    n = norm_name(name)
+    return e if e else (p if p else n)
 
-    # ── Current-year aggregates ───────────────────────────────────────────────
-    total_raised  = 0.0
-    total_tickets = 0
-    buyers_cur    = set()
-    daily_totals  = defaultdict(float)
-    tier_counts   = defaultdict(int)
-    top_buyers    = defaultdict(float)
-    map_cur: dict[str, Buyer] = {}
-    daily_cur: dict[str, float] = defaultdict(float)
+  total_raised = 0.0
+  total_tickets = 0
+  buyers_cur: set[str] = set()
+  daily_totals: dict[str, float] = defaultdict(float)
+  tier_counts: dict[int, int] = defaultdict(int)
+  top_buyers: dict[str, float] = defaultdict(float)
+  map_cur: dict[str, Buyer] = {}
+  daily_cur: dict[str, float] = defaultdict(float)
 
-    for f in cur_fields:
-        tickets = int(f.get("NumberofChances", 0) or 0)
-        if tickets == 0:
-            continue
-        amount  = float(f.get("TotalPaid", 0) or 0)
-        person  = str(f.get("Person", "Unknown") or "Unknown").strip()
-        email   = str(f.get("Email", "") or "").strip()
-        phone   = str(f.get("Phone", "") or "").strip()
-        day     = (f.get("SubmissionDate") or "")[:10]
+  for fields in cur_fields:
+    tickets = int(fields.get("NumberofChances", 0) or 0)
+    if tickets == 0:
+      continue
+    amount = float(fields.get("TotalPaid", 0) or 0)
+    person = str(fields.get("Person", "Unknown") or "Unknown").strip()
+    email = str(fields.get("Email", "") or "").strip()
+    phone = str(fields.get("Phone", "") or "").strip()
+    day = (fields.get("SubmissionDate") or "")[:10]
 
-        total_raised  += amount
-        total_tickets += tickets
-        buyers_cur.add(person.lower())
-        top_buyers[person] += amount
-        if tickets > 0:
-            tier_counts[tickets] += 1
-        if day:
-            daily_totals[day] += amount
-            daily_cur[day]    += amount
+    total_raised += amount
+    total_tickets += tickets
+    buyers_cur.add(person.lower())
+    top_buyers[person] += amount
+    tier_counts[tickets] += 1
+    if day:
+      daily_totals[day] += amount
+      daily_cur[day] += amount
 
-        k = _key(email, phone, person)
-        if k not in map_cur:
-            map_cur[k] = Buyer(name=person, email=email, phone=phone)
-        map_cur[k].tickets_cur += tickets
-        map_cur[k].amount_cur  += amount
+    buyer_key = _key(email, phone, person)
+    if buyer_key not in map_cur:
+      map_cur[buyer_key] = Buyer(name=person, email=email, phone=phone)
+    map_cur[buyer_key].tickets_cur += tickets
+    map_cur[buyer_key].amount_cur += amount
 
-    sorted_days = sorted(daily_totals.keys())
-    top5 = sorted(top_buyers.items(), key=lambda x: x[1], reverse=True)[:5]
-    tier_label_map = {1: "1 Ticket ($25)", 3: "3 Tickets ($60)", 6: "6 Tickets ($100)", 12: "12 Tickets ($200)"}
-    tiers = [(tier_label_map.get(k, f"{k} Tickets"), v) for k, v in sorted(tier_counts.items())]
+  sorted_days = sorted(daily_totals.keys())
+  top5 = sorted(top_buyers.items(), key=lambda item: item[1], reverse=True)[:5]
+  tier_label_map = {1: "1 Ticket ($25)", 3: "3 Tickets ($60)", 6: "6 Tickets ($100)", 12: "12 Tickets ($200)"}
+  tiers = [(tier_label_map.get(count, f"{count} Tickets"), total) for count, total in sorted(tier_counts.items())]
 
-    # ── Previous-year aggregates (with same-date cutoff for YoY) ─────────────
-    map_prev: dict[str, Buyer] = {}
-    daily_prev: dict[str, float] = defaultdict(float)
-    todate_prev_amt  = 0.0
-    todate_prev_tix  = 0
-    todate_prev_keys: set[str] = set()
-    total_prev_amt   = 0.0
-    total_prev_tix   = 0
+  map_prev: dict[str, Buyer] = {}
+  daily_prev: dict[str, float] = defaultdict(float)
+  todate_prev_amt = 0.0
+  todate_prev_tix = 0
+  todate_prev_keys: set[str] = set()
 
-    for f in prev_fields:
-        amount  = float(f.get("TotalPaid", 0) or 0)
-        tickets = int(f.get("NumberofChances", 0) or 0)
-        person  = str(f.get("Person", "Unknown") or "Unknown").strip()
-        email   = str(f.get("Email", "") or "").strip()
-        phone   = str(f.get("Phone", "") or "").strip()
-        day     = (f.get("SubmissionDate") or "")[:10]
+  for fields in prev_fields:
+    amount = float(fields.get("TotalPaid", 0) or 0)
+    tickets = int(fields.get("NumberofChances", 0) or 0)
+    person = str(fields.get("Person", "Unknown") or "Unknown").strip()
+    email = str(fields.get("Email", "") or "").strip()
+    phone = str(fields.get("Phone", "") or "").strip()
+    day = (fields.get("SubmissionDate") or "")[:10]
 
-        total_prev_amt  += amount
-        total_prev_tix  += tickets
-        if day:
-            daily_prev[day] += amount
-            if day <= str(SAME_DAY_PREV):
-                todate_prev_amt  += amount
-                todate_prev_tix  += tickets
+    if day:
+      daily_prev[day] += amount
+      if day <= str(SAME_DAY_PREV):
+        todate_prev_amt += amount
+        todate_prev_tix += tickets
 
-        k = _key(email, phone, person)
-        if day and day <= str(SAME_DAY_PREV):
-            todate_prev_keys.add(k)
-        if k not in map_prev:
-            map_prev[k] = Buyer(name=person, email=email, phone=phone)
-        map_prev[k].tickets_prev += tickets
-        map_prev[k].amount_prev  += amount
+    buyer_key = _key(email, phone, person)
+    if day and day <= str(SAME_DAY_PREV):
+      todate_prev_keys.add(buyer_key)
+    if buyer_key not in map_prev:
+      map_prev[buyer_key] = Buyer(name=person, email=email, phone=phone)
+    map_prev[buyer_key].tickets_prev += tickets
+    map_prev[buyer_key].amount_prev += amount
 
-    if include_history and csv_rows:
-      for row in csv_rows:
-        e_n = norm_email(row["email"])
-        p_n = norm_phone(row["phone"])
-        n_n = norm_name(row["name"])
-        matched = None
-        if e_n and e_n in map_prev:
-          matched = e_n
-        elif p_n and p_n in map_prev:
-          matched = p_n
-        else:
-          for k, b in map_prev.items():
-            if norm_name(b.name) == n_n:
-              matched = k
-              break
-        if matched:
-          b = map_prev[matched]
-          if not b.email and row["email"]:
-            b.email = row["email"]
-          if not b.phone and row["phone"]:
-            b.phone = row["phone"]
-        else:
-          k = e_n or p_n or n_n
-          if k and k not in map_prev:
-            map_prev[k] = Buyer(name=row["name"], email=row["email"], phone=row["phone"])
+  if include_history and csv_rows:
+    for row in csv_rows:
+      email_key = norm_email(row["email"])
+      phone_key = norm_phone(row["phone"])
+      name_key = norm_name(row["name"])
+      matched_key = None
 
-    # ── Cross-reference: returning / prospects / new ──────────────────────────
-    emails_cur = {norm_email(b.email)  for b in map_cur.values() if b.email}
-    phones_cur = {norm_phone(b.phone)  for b in map_cur.values() if b.phone}
-    names_cur  = {norm_name(b.name)    for b in map_cur.values()}
-    emails_prev = {norm_email(b.email) for b in map_prev.values() if b.email}
-    phones_prev = {norm_phone(b.phone) for b in map_prev.values() if b.phone}
-    names_prev  = {norm_name(b.name)   for b in map_prev.values()}
+      if email_key and email_key in map_prev:
+        matched_key = email_key
+      elif phone_key and phone_key in map_prev:
+        matched_key = phone_key
+      else:
+        for existing_key, buyer in map_prev.items():
+          if norm_name(buyer.name) == name_key:
+            matched_key = existing_key
+            break
 
-    returning: list[Buyer] = []
-    prospects: list[Buyer] = []
-    for _k, b in map_prev.items():
-        e = norm_email(b.email); p = norm_phone(b.phone); n = norm_name(b.name)
-        is_ret = (e and e in emails_cur) or (p and p in phones_cur) or (n and n in names_cur)
-        if is_ret:
-            for bc in map_cur.values():
-                e2 = norm_email(bc.email); p2 = norm_phone(bc.phone); n2 = norm_name(bc.name)
-                if (e and e2 and e == e2) or (p and p2 and p == p2) or n == n2:
-                    b.tickets_cur = bc.tickets_cur
-                    b.amount_cur  = bc.amount_cur
-                    if not b.email and bc.email: b.email = bc.email
-                    if not b.phone and bc.phone: b.phone = bc.phone
-                    break
-            returning.append(b)
-        else:
-            prospects.append(b)
+      if matched_key:
+        buyer = map_prev[matched_key]
+        if not buyer.email and row["email"]:
+          buyer.email = row["email"]
+        if not buyer.phone and row["phone"]:
+          buyer.phone = row["phone"]
+      else:
+        fallback_key = email_key or phone_key or name_key
+        if fallback_key and fallback_key not in map_prev:
+          map_prev[fallback_key] = Buyer(name=row["name"], email=row["email"], phone=row["phone"])
 
-    new_buyers: list[Buyer] = [
-        b for _k, b in map_cur.items()
-        if not (
-            (norm_email(b.email) and norm_email(b.email) in emails_prev) or
-            (norm_phone(b.phone) and norm_phone(b.phone) in phones_prev) or
-            (norm_name(b.name)  and norm_name(b.name)  in names_prev)
-        )
-    ]
+  emails_cur = {norm_email(buyer.email) for buyer in map_cur.values() if buyer.email}
+  phones_cur = {norm_phone(buyer.phone) for buyer in map_cur.values() if buyer.phone}
+  names_cur = {norm_name(buyer.name) for buyer in map_cur.values()}
+  emails_prev = {norm_email(buyer.email) for buyer in map_prev.values() if buyer.email}
+  phones_prev = {norm_phone(buyer.phone) for buyer in map_prev.values() if buyer.phone}
+  names_prev = {norm_name(buyer.name) for buyer in map_prev.values()}
 
-    returning.sort(key=lambda b: b.amount_cur,  reverse=True)
-    prospects.sort(key=lambda b: b.amount_prev, reverse=True)
-    new_buyers.sort(key=lambda b: b.amount_cur, reverse=True)
-
-    # ── Cumulative chart (MM-DD aligned, trimmed to active sales window) ───────
-    # Build the full 365-label axis first, then crop to the active window so
-    # the dead gap between last year's final sale and this year's opening day
-    # is removed from the chart x-axis.
-    all_labels: list[str] = []
-    _d = date(2001, 1, 1)
-    while _d.year == 2001:
-        all_labels.append(_d.strftime("%m-%d"))
-        _d += timedelta(days=1)
-    today_mmdd = TODAY.strftime("%m-%d")
-
-    def build_cumul(daily: dict, year: int, labels: list[str], cap: str | None) -> list:
-        out = []; running = 0.0
-        for mmdd in labels:
-            if cap and mmdd > cap:
-                out.append(None); continue
-            running += daily.get(f"{year}-{mmdd}", 0.0)
-            out.append(round(running, 2))
-        return out
-
-    # Determine the active window across both years.
-    # The raffle event is always around April 10-11, so the season always ends
-    # by "04-11" regardless of whether all sales data has arrived yet.
-    EVENT_END_MMDD = "04-11"
-
-    prev_days_with_sales = [k[5:] for k in daily_prev if daily_prev[k] > 0]  # MM-DD
-    cur_days_with_sales  = [k[5:] for k in daily_cur  if daily_cur[k]  > 0]
-    window_start = min(
-        (min(prev_days_with_sales) if prev_days_with_sales else today_mmdd),
-        (min(cur_days_with_sales)  if cur_days_with_sales  else today_mmdd),
+  returning: list[Buyer] = []
+  prospects: list[Buyer] = []
+  for buyer in map_prev.values():
+    email_key = norm_email(buyer.email)
+    phone_key = norm_phone(buyer.phone)
+    name_key = norm_name(buyer.name)
+    is_returning = (
+      (email_key and email_key in emails_cur)
+      or (phone_key and phone_key in phones_cur)
+      or (name_key and name_key in names_cur)
     )
-    # Always extend the axis to the event end date so both lines are compared
-    # over the full season. Cap the current-year line at today so it doesn't
-    # show a flat run into the future.
-    window_end = EVENT_END_MMDD
-    master_labels = [l for l in all_labels if window_start <= l <= window_end]
+    if is_returning:
+      for current_buyer in map_cur.values():
+        email_match = email_key and norm_email(current_buyer.email) == email_key
+        phone_match = phone_key and norm_phone(current_buyer.phone) == phone_key
+        name_match = norm_name(current_buyer.name) == name_key
+        if email_match or phone_match or name_match:
+          buyer.tickets_cur = current_buyer.tickets_cur
+          buyer.amount_cur = current_buyer.amount_cur
+          if not buyer.email and current_buyer.email:
+            buyer.email = current_buyer.email
+          if not buyer.phone and current_buyer.phone:
+            buyer.phone = current_buyer.phone
+          break
+      returning.append(buyer)
+    else:
+      prospects.append(buyer)
 
-    chart_prev = build_cumul(daily_prev, PREV_YEAR,    master_labels, None)
-    chart_cur  = build_cumul(daily_cur,  CURRENT_YEAR, master_labels, today_mmdd)
+  new_buyers = [
+    buyer for buyer in map_cur.values()
+    if not (
+      (norm_email(buyer.email) and norm_email(buyer.email) in emails_prev)
+      or (norm_phone(buyer.phone) and norm_phone(buyer.phone) in phones_prev)
+      or (norm_name(buyer.name) and norm_name(buyer.name) in names_prev)
+    )
+  ]
 
-    # ── HTML table rows ───────────────────────────────────────────────────────
-    def _email_link(e):
-        e = esc(e)
-        return f'<a href="mailto:{e}">{e}</a>' if e else ""
+  returning.sort(key=lambda buyer: buyer.amount_cur, reverse=True)
+  prospects.sort(key=lambda buyer: buyer.amount_prev, reverse=True)
+  new_buyers.sort(key=lambda buyer: buyer.amount_cur, reverse=True)
 
-    def ret_row(b: Buyer) -> str:
-        n, e, p = esc(b.name), b.email, esc(b.phone)
-        return (
-            f'<tr data-search="{esc(b.name)} {esc(b.email)} {p}">'
-            f'<td>{esc(b.name)}</td><td>{_email_link(e)}</td><td>{p}</td>'
-            f'<td class="r">{b.tickets_prev or "—"}</td>'
-            f'<td class="r amt">${b.amount_prev:,.0f}</td>'
-            f'<td class="r">{b.tickets_cur or "—"}</td>'
-            f'<td class="r amt hi">${b.amount_cur:,.0f}</td>'
-            f'</tr>'
-        )
+  all_labels: list[str] = []
+  cursor = date(2001, 1, 1)
+  while cursor.year == 2001:
+    all_labels.append(cursor.strftime("%m-%d"))
+    cursor += timedelta(days=1)
+  today_mmdd = TODAY.strftime("%m-%d")
 
-    def pro_row(b: Buyer) -> str:
-        n, e, p = esc(b.name), b.email, esc(b.phone)
-        return (
-            f'<tr data-search="{esc(b.name)} {esc(b.email)} {p}">'
-            f'<td>{esc(b.name)}</td><td>{_email_link(e)}</td><td>{p}</td>'
-            f'<td class="r">{b.tickets_prev or "—"}</td>'
-            f'<td class="r amt">${b.amount_prev:,.0f}</td>'
-            f'</tr>'
-        )
+  def build_cumul(daily: dict[str, float], year: int, labels: list[str], cap: str | None) -> list[float | None]:
+    running = 0.0
+    out: list[float | None] = []
+    for mmdd in labels:
+      if cap and mmdd > cap:
+        out.append(None)
+        continue
+      running += daily.get(f"{year}-{mmdd}", 0.0)
+      out.append(round(running, 2))
+    return out
 
-    def new_row(b: Buyer) -> str:
-        n, e, p = esc(b.name), b.email, esc(b.phone)
-        return (
-            f'<tr data-search="{esc(b.name)} {esc(b.email)} {p}">'
-            f'<td>{esc(b.name)}</td><td>{_email_link(e)}</td><td>{p}</td>'
-            f'<td class="r">{b.tickets_cur or "—"}</td>'
-            f'<td class="r amt hi">${b.amount_cur:,.0f}</td>'
-            f'</tr>'
-        )
+  event_end_mmdd = "04-11"
+  prev_days_with_sales = [day[5:] for day, value in daily_prev.items() if value > 0]
+  cur_days_with_sales = [day[5:] for day, value in daily_cur.items() if value > 0]
+  window_start = min(
+    min(prev_days_with_sales) if prev_days_with_sales else today_mmdd,
+    min(cur_days_with_sales) if cur_days_with_sales else today_mmdd,
+  )
+  master_labels = [label for label in all_labels if window_start <= label <= event_end_mmdd]
+  chart_prev = build_cumul(daily_prev, PREV_YEAR, master_labels, None)
+  chart_cur = build_cumul(daily_cur, CURRENT_YEAR, master_labels, today_mmdd)
 
-    EMPTY_RET = f'<tr><td colspan="7" class="empty">No returning buyers yet.</td></tr>'
-    EMPTY_PRO = f'<tr><td colspan="5" class="empty">All {PREV_YEAR} buyers are already in {CURRENT_YEAR}!</td></tr>'
-    EMPTY_NEW = f'<tr><td colspan="5" class="empty">No first-time {CURRENT_YEAR} buyers yet.</td></tr>'
+  def _email_link(email: str) -> str:
+    escaped = esc(email)
+    return f'<a href="mailto:{escaped}">{escaped}</a>' if escaped else ""
 
-    ret_rate = round(len(returning) / len(map_prev) * 100, 1) if map_prev else 0.0
-    pct_diff_raw = round((total_raised - todate_prev_amt) / todate_prev_amt * 100, 1) if todate_prev_amt else 0.0
-    goal = config["goal"]
-    goal_pct = min(100, round(total_raised / goal * 100, 1)) if goal > 0 else 0.0
-    goal_remaining = max(0.0, goal - total_raised) if goal > 0 else 0.0
+  def ret_row(buyer: Buyer) -> str:
+    phone = esc(buyer.phone)
+    return (
+      f'<tr data-search="{esc(buyer.name)} {esc(buyer.email)} {phone}">'
+      f'<td>{esc(buyer.name)}</td><td>{_email_link(buyer.email)}</td><td>{phone}</td>'
+      f'<td class="r">{buyer.tickets_prev or "—"}</td>'
+      f'<td class="r amt">${buyer.amount_prev:,.0f}</td>'
+      f'<td class="r">{buyer.tickets_cur or "—"}</td>'
+      f'<td class="r amt hi">${buyer.amount_cur:,.0f}</td>'
+      f'</tr>'
+    )
 
-    return {
-      "slug":                  config["slug"],
-      "raffle_key":            raffle_key,
-      "raffle_name":           config["display_name"],
-      "raffle_short_name":     config["short_name"],
-      "has_history":           include_history,
-        # Current-year stats
-        "total_raised":          total_raised,
-        "total_tickets":         total_tickets,
-        "buyer_count":           len(buyers_cur),
-        "daily_labels":          sorted_days,
-        "daily_values":          [daily_totals[d] for d in sorted_days],
-        "tier_labels":           [t[0] for t in tiers],
-        "tier_values":           [t[1] for t in tiers],
-        "top5":                  top5,
-        "goal":                  goal,
-        "pct":                   goal_pct,
-        "goal_remaining":        goal_remaining,
-        "year":                  CURRENT_YEAR,
-        "prev_year":             PREV_YEAR,
-        "today":                 TODAY.strftime("%B %d, %Y"),
-        "updated_at":            datetime.now(_TZ).strftime("%B %d, %Y %I:%M %p %Z"),
-        # YoY
-        "todate_prev_amt":       todate_prev_amt,
-        "todate_prev_tix":       todate_prev_tix,
-        "todate_prev_buyers":    len(todate_prev_keys),
-        "pct_diff":              pct_diff_raw,
-        "same_day_prev":         SAME_DAY_PREV.strftime("%b %d"),
-        # Cumulative chart
-        "chart_master_labels":   json.dumps(master_labels),
-        "chart_prev":            json.dumps(chart_prev),
-        "chart_cur":             json.dumps(chart_cur),
-        "today_mmdd":            json.dumps(today_mmdd),
-        # Retention tables
-        "n_returning":           len(returning),
-        "n_prospects":           len(prospects),
-        "n_new":                 len(new_buyers),
-        "ret_rate":              ret_rate,
-        "rows_returning":        "".join(ret_row(b) for b in returning) or EMPTY_RET,
-        "rows_prospects":        "".join(pro_row(b) for b in prospects) or EMPTY_PRO,
-        "rows_new":              "".join(new_row(b) for b in new_buyers) or EMPTY_NEW,
-        # Raw buyer lists (for Excel export)
-        "_returning":            returning,
-        "_prospects":            prospects,
-        "_new_buyers":           new_buyers,
-        "_top5":                 top5,
-        "_daily_labels":         sorted_days,
-        "_daily_values":         [daily_totals[d] for d in sorted_days],
-    }
+  def pro_row(buyer: Buyer) -> str:
+    phone = esc(buyer.phone)
+    return (
+      f'<tr data-search="{esc(buyer.name)} {esc(buyer.email)} {phone}">'
+      f'<td>{esc(buyer.name)}</td><td>{_email_link(buyer.email)}</td><td>{phone}</td>'
+      f'<td class="r">{buyer.tickets_prev or "—"}</td>'
+      f'<td class="r amt">${buyer.amount_prev:,.0f}</td>'
+      f'</tr>'
+    )
+
+  def new_row(buyer: Buyer) -> str:
+    phone = esc(buyer.phone)
+    return (
+      f'<tr data-search="{esc(buyer.name)} {esc(buyer.email)} {phone}">'
+      f'<td>{esc(buyer.name)}</td><td>{_email_link(buyer.email)}</td><td>{phone}</td>'
+      f'<td class="r">{buyer.tickets_cur or "—"}</td>'
+      f'<td class="r amt hi">${buyer.amount_cur:,.0f}</td>'
+      f'</tr>'
+    )
+
+  empty_ret = '<tr><td colspan="7" class="empty">No returning buyers yet.</td></tr>'
+  empty_pro = f'<tr><td colspan="5" class="empty">All {PREV_YEAR} buyers are already in {CURRENT_YEAR}!</td></tr>'
+  empty_new = f'<tr><td colspan="5" class="empty">No first-time {CURRENT_YEAR} buyers yet.</td></tr>'
+
+  ret_rate = round(len(returning) / len(map_prev) * 100, 1) if map_prev else 0.0
+  pct_diff_raw = round((total_raised - todate_prev_amt) / todate_prev_amt * 100, 1) if todate_prev_amt else 0.0
+  goal = config["goal"]
+  goal_pct = min(100, round(total_raised / goal * 100, 1)) if goal > 0 else 0.0
+  goal_remaining = max(0.0, goal - total_raised) if goal > 0 else 0.0
+
+  return {
+    "slug": config["slug"],
+    "raffle_key": raffle_key,
+    "raffle_name": config["display_name"],
+    "raffle_short_name": config["short_name"],
+    "has_history": include_history,
+    "total_raised": total_raised,
+    "total_tickets": total_tickets,
+    "buyer_count": len(buyers_cur),
+    "daily_labels": sorted_days,
+    "daily_values": [daily_totals[day] for day in sorted_days],
+    "tier_labels": [tier[0] for tier in tiers],
+    "tier_values": [tier[1] for tier in tiers],
+    "top5": top5,
+    "goal": goal,
+    "pct": goal_pct,
+    "goal_remaining": goal_remaining,
+    "year": CURRENT_YEAR,
+    "prev_year": PREV_YEAR,
+    "today": TODAY.strftime("%B %d, %Y"),
+    "updated_at": datetime.now(_TZ).strftime("%B %d, %Y %I:%M %p %Z"),
+    "todate_prev_amt": todate_prev_amt,
+    "todate_prev_tix": todate_prev_tix,
+    "todate_prev_buyers": len(todate_prev_keys),
+    "pct_diff": pct_diff_raw,
+    "same_day_prev": SAME_DAY_PREV.strftime("%b %d"),
+    "chart_master_labels": json.dumps(master_labels),
+    "chart_prev": json.dumps(chart_prev),
+    "chart_cur": json.dumps(chart_cur),
+    "today_mmdd": json.dumps(today_mmdd),
+    "n_returning": len(returning),
+    "n_prospects": len(prospects),
+    "n_new": len(new_buyers),
+    "ret_rate": ret_rate,
+    "rows_returning": "".join(ret_row(buyer) for buyer in returning) or empty_ret,
+    "rows_prospects": "".join(pro_row(buyer) for buyer in prospects) or empty_pro,
+    "rows_new": "".join(new_row(buyer) for buyer in new_buyers) or empty_new,
+    "_returning": returning,
+    "_prospects": prospects,
+    "_new_buyers": new_buyers,
+    "_top5": top5,
+    "_daily_labels": sorted_days,
+    "_daily_values": [daily_totals[day] for day in sorted_days],
+  }
 
 # ── Excel export ─────────────────────────────────────────────────────────────
 
