@@ -139,22 +139,22 @@ class Buyer:
         self.amount_cur   = 0.0
 
 
-    RAFFLE_CONFIGS = {
-      "hogs_for_the_cause": {
+RAFFLE_CONFIGS = {
+    "hogs_for_the_cause": {
         "slug": "hogs",
         "display_name": "Hogs for the Cause",
         "short_name": "Hogs",
         "goal": GOAL,
         "include_history": True,
-      },
-      "crna_essential_bundle": {
+    },
+    "crna_essential_bundle": {
         "slug": "crna",
         "display_name": "CRNA Essential Bundle",
         "short_name": "CRNA Bundle",
         "goal": CRNA_GOAL,
         "include_history": False,
-      },
-    }
+    },
+}
 
 # ── Processing ────────────────────────────────────────────────────────────────
 
