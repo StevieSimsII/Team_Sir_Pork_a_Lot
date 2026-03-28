@@ -4,11 +4,19 @@ A virtual raffle ticket sales website for **Team Sir Pork a Lot** at Hogs for th
 
 ## Tech Stack
 
-- **Next.js 15** (App Router)
+- **Next.js 16** (App Router)
 - **TypeScript** + **Tailwind CSS**
 - **Stripe Checkout** — secure payment processing
 - **Supabase** — PostgreSQL database for order tracking
 - **Vercel** — hosting
+
+## Project Layout
+
+- `src/` — Next.js app and UI components
+- `public/` — deployed web assets such as `Photo_2.jpeg` and `qrcode.png`
+- `dashboard/` — Python reporting and backfill utilities
+- `data/reference/` — local reference data used by reporting scripts
+- `docs/raffle-materials/` — unreferenced collateral and planning assets kept out of the repo root
 
 ## Getting Started
 

@@ -46,9 +46,8 @@ PREV_YEAR    = CURRENT_YEAR - 1
 SAME_DAY_PREV = date(PREV_YEAR, TODAY.month, TODAY.day)
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH    = os.path.normpath(
-    os.path.join(_SCRIPT_DIR, "..", "Hogs for the Cause 2025 Raffle.csv")
-)
+_REPO_ROOT = os.path.normpath(os.path.join(_SCRIPT_DIR, ".."))
+CSV_PATH = os.path.join(_REPO_ROOT, "data", "reference", "hogs-for-the-cause-2025-raffle.csv")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
