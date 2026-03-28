@@ -37,6 +37,7 @@ SP_HOSTNAME   = os.environ.get("SHAREPOINT_HOSTNAME", "kingsofcode.sharepoint.co
 SP_SITE_PATH  = os.environ.get("SHAREPOINT_SITE_PATH", "/sites/StevieCopilot")
 LIST_ID       = os.environ["SHAREPOINT_LIST_ID"]
 GOAL          = int(os.environ.get("GOAL_AMOUNT", "30000"))
+CRNA_GOAL     = int(os.environ.get("CRNA_BUNDLE_GOAL_AMOUNT", "0"))
 
 _TZ          = ZoneInfo("America/Chicago")
 TODAY        = datetime.now(_TZ).date()
@@ -137,28 +138,46 @@ class Buyer:
         self.tickets_cur  = 0
         self.amount_cur   = 0.0
 
+
+    RAFFLE_CONFIGS = {
+      "hogs_for_the_cause": {
+        "slug": "hogs",
+        "display_name": "Hogs for the Cause",
+        "short_name": "Hogs",
+        "goal": GOAL,
+        "include_history": True,
+      },
+      "crna_essential_bundle": {
+        "slug": "crna",
+        "display_name": "CRNA Essential Bundle",
+        "short_name": "CRNA Bundle",
+        "goal": CRNA_GOAL,
+        "include_history": False,
+      },
+    }
+
 # ── Processing ────────────────────────────────────────────────────────────────
 
-def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
+def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] | None = None) -> dict:
+  config = RAFFLE_CONFIGS[raffle_key]
+  include_history = config["include_history"]
 
-    # ── Bucket items by year (Hogs_For_the_Cause only) ─────────────────────
-    cur_fields:  list[dict] = []
-    prev_fields: list[dict] = []
-    # Debug: show all unique RaffleName values before filtering
-    unique_raffles = {(item.get("fields") or {}).get("RaffleName") for item in all_items}
-    print(f"  Unique RaffleName values in list: {sorted(str(r) for r in unique_raffles)}")
-    for item in all_items:
-        f      = item.get("fields", {})
-        raffle = (f.get("RaffleName") or "").strip()
-        # Case-insensitive match to handle any casing in SharePoint
-        if raffle.lower() != "hogs_for_the_cause":
-            continue
-        yr = (f.get("SubmissionDate") or "")[:4]
-        if yr == str(CURRENT_YEAR):
-            cur_fields.append(f)
-        elif yr == str(PREV_YEAR):
-            prev_fields.append(f)
-    print(f"  {PREV_YEAR}: {len(prev_fields)} items,  {CURRENT_YEAR}: {len(cur_fields)} items")
+  # ── Bucket items by year for the requested raffle ───────────────────────
+  cur_fields: list[dict] = []
+  prev_fields: list[dict] = []
+  for item in all_items:
+    f = item.get("fields", {})
+    raffle = (f.get("RaffleName") or "").strip().lower()
+    if raffle != raffle_key:
+      continue
+    yr = (f.get("SubmissionDate") or "")[:4]
+    if yr == str(CURRENT_YEAR):
+      cur_fields.append(f)
+    elif include_history and yr == str(PREV_YEAR):
+      prev_fields.append(f)
+  print(f"  {config['display_name']}: {len(cur_fields)} current-year items")
+  if include_history:
+    print(f"    {PREV_YEAR}: {len(prev_fields)} prior-year items")
 
     # ── Helper ────────────────────────────────────────────────────────────────
     def _key(email, phone, name):
@@ -241,28 +260,31 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
         map_prev[k].tickets_prev += tickets
         map_prev[k].amount_prev  += amount
 
-    # Supplement with CSV rows
-    for row in csv_rows:
+    if include_history and csv_rows:
+      for row in csv_rows:
         e_n = norm_email(row["email"])
         p_n = norm_phone(row["phone"])
         n_n = norm_name(row["name"])
         matched = None
         if e_n and e_n in map_prev:
-            matched = e_n
+          matched = e_n
         elif p_n and p_n in map_prev:
-            matched = p_n
+          matched = p_n
         else:
-            for k, b in map_prev.items():
-                if norm_name(b.name) == n_n:
-                    matched = k; break
+          for k, b in map_prev.items():
+            if norm_name(b.name) == n_n:
+              matched = k
+              break
         if matched:
-            b = map_prev[matched]
-            if not b.email and row["email"]: b.email = row["email"]
-            if not b.phone and row["phone"]: b.phone = row["phone"]
+          b = map_prev[matched]
+          if not b.email and row["email"]:
+            b.email = row["email"]
+          if not b.phone and row["phone"]:
+            b.phone = row["phone"]
         else:
-            k = e_n or p_n or n_n
-            if k and k not in map_prev:
-                map_prev[k] = Buyer(name=row["name"], email=row["email"], phone=row["phone"])
+          k = e_n or p_n or n_n
+          if k and k not in map_prev:
+            map_prev[k] = Buyer(name=row["name"], email=row["email"], phone=row["phone"])
 
     # ── Cross-reference: returning / prospects / new ──────────────────────────
     emails_cur = {norm_email(b.email)  for b in map_cur.values() if b.email}
@@ -386,8 +408,16 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
 
     ret_rate = round(len(returning) / len(map_prev) * 100, 1) if map_prev else 0.0
     pct_diff_raw = round((total_raised - todate_prev_amt) / todate_prev_amt * 100, 1) if todate_prev_amt else 0.0
+    goal = config["goal"]
+    goal_pct = min(100, round(total_raised / goal * 100, 1)) if goal > 0 else 0.0
+    goal_remaining = max(0.0, goal - total_raised) if goal > 0 else 0.0
 
     return {
+      "slug":                  config["slug"],
+      "raffle_key":            raffle_key,
+      "raffle_name":           config["display_name"],
+      "raffle_short_name":     config["short_name"],
+      "has_history":           include_history,
         # Current-year stats
         "total_raised":          total_raised,
         "total_tickets":         total_tickets,
@@ -397,8 +427,9 @@ def process(all_items: list[dict], csv_rows: list[dict]) -> dict:
         "tier_labels":           [t[0] for t in tiers],
         "tier_values":           [t[1] for t in tiers],
         "top5":                  top5,
-        "goal":                  GOAL,
-        "pct":                   min(100, round(total_raised / GOAL * 100, 1)),
+        "goal":                  goal,
+        "pct":                   goal_pct,
+        "goal_remaining":        goal_remaining,
         "year":                  CURRENT_YEAR,
         "prev_year":             PREV_YEAR,
         "today":                 TODAY.strftime("%B %d, %Y"),
@@ -613,22 +644,282 @@ def write_excel(d: dict, out_dir: str) -> str:
 
 # ── HTML generation ───────────────────────────────────────────────────────────
 
-def render_html(d: dict) -> str:
-    top5_rows = "".join(
-        f'<tr><td class="td-name">{esc(name)}</td><td class="td-amount">${amt:,.0f}</td></tr>'
-        for name, amt in d["top5"]
+def render_html(report_data: dict[str, dict]) -> str:
+    raffles = [report_data[key] for key in RAFFLE_CONFIGS if key in report_data]
+    if not raffles:
+        raise ValueError("No raffle data available to render.")
+
+    chart_payload = {
+        raffle["slug"]: {
+            "daily_labels": raffle["daily_labels"],
+            "daily_values": raffle["daily_values"],
+            "tier_labels": raffle["tier_labels"],
+            "tier_values": raffle["tier_values"],
+            "chart_master_labels": json.loads(raffle["chart_master_labels"]),
+            "chart_prev": json.loads(raffle["chart_prev"]),
+            "chart_cur": json.loads(raffle["chart_cur"]),
+            "today_mmdd": json.loads(raffle["today_mmdd"]),
+            "has_history": raffle["has_history"],
+            "year": raffle["year"],
+            "prev_year": raffle["prev_year"],
+        }
+        for raffle in raffles
+    }
+
+    def render_goal_block(raffle: dict) -> str:
+        if raffle["goal"] <= 0:
+            return (
+                '<div class="goal-card goal-card--empty">'
+                '<div class="goal-title">No goal configured</div>'
+                '<div class="goal-empty-copy">Current totals are live, but this raffle does not have a progress target configured yet.</div>'
+                '</div>'
+            )
+
+        return f"""
+  <div class="goal-card">
+    <div class="goal-header">
+      <span class="goal-title">Goal Progress - ${raffle['goal']:,}</span>
+      <span class="goal-pct">{raffle['pct']}%</span>
+    </div>
+    <div class="bar-track"><div class="bar-fill" style="width:{raffle['pct']}%"></div></div>
+    <div class="goal-sub">
+      <span>${raffle['total_raised']:,.0f} raised</span>
+      <span>${raffle['goal_remaining']:,.0f} to go</span>
+    </div>
+  </div>"""
+
+    def render_top5_rows(raffle: dict) -> str:
+        rows = "".join(
+            f'<tr><td class="td-name">{esc(name)}</td><td class="td-amount">${amt:,.0f}</td></tr>'
+            for name, amt in raffle["top5"]
+        )
+        if rows:
+            return rows
+        return '<tr><td class="td-name" colspan="2" style="color:var(--muted);text-align:center">No data yet</td></tr>'
+
+    def render_retention_panel(raffle: dict) -> str:
+        if not raffle["has_history"]:
+            return f"""
+  <div id="tab-{raffle['slug']}-retention" class="tab-panel">
+    <div class="section section-note">
+      <div class="sec-hdr">
+        <span class="sec-title">Current-Year Only</span>
+      </div>
+      <p class="sec-desc">No prior-year data exists yet for {esc(raffle['raffle_name'])}, so this page only shows live totals, ticket mix, and top buyers for {raffle['year']}.</p>
+    </div>
+  </div>"""
+
+        arrow = "▲" if raffle["pct_diff"] >= 0 else "▼"
+        arrow_cls = "up" if raffle["pct_diff"] >= 0 else "dn"
+        badge_cls = "badge-up" if raffle["pct_diff"] >= 0 else "badge-dn"
+        sign = "+" if raffle["pct_diff"] >= 0 else ""
+
+        return f"""
+  <div id="tab-{raffle['slug']}-retention" class="tab-panel">
+    <div class="ret-grid">
+      <div class="ret-card">
+        <div class="ret-label">{raffle['year']} Buyers</div>
+        <div class="ret-val cyan">{raffle['buyer_count']}</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">{raffle['prev_year']} Buyers</div>
+        <div class="ret-val purp">{raffle['n_returning'] + raffle['n_prospects']}</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">Returning</div>
+        <div class="ret-val grn">{raffle['n_returning']}</div>
+        <div class="ret-sub">Retention: {raffle['ret_rate']}%</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">Prospects</div>
+        <div class="ret-val gold">{raffle['n_prospects']}</div>
+        <div class="ret-sub">{raffle['prev_year']} buyers not yet in {raffle['year']}</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">New Buyers</div>
+        <div class="ret-val pink">{raffle['n_new']}</div>
+        <div class="ret-sub">First-timers in {raffle['year']}</div>
+      </div>
+    </div>
+
+    <div class="yoy-card">
+      <div class="yoy-title">Year-over-Year - through {raffle['today']} vs same date in {raffle['prev_year']}</div>
+      <div class="yoy-grid">
+        <div class="yoy-col">
+          <div class="yoy-yr">{raffle['prev_year']} (through {raffle['same_day_prev']})</div>
+          <div class="yoy-val purp">${raffle['todate_prev_amt']:,.0f}</div>
+          <div class="yoy-sub">{raffle['todate_prev_tix']:,} tickets · {raffle['todate_prev_buyers']} buyers</div>
+        </div>
+        <div class="vs-col">
+          <div class="vs-arrow {arrow_cls}">{arrow}</div>
+          <div class="yoy-badge {badge_cls}">{sign}{raffle['pct_diff']}%</div>
+        </div>
+        <div class="yoy-col">
+          <div class="yoy-yr">{raffle['year']} (to date)</div>
+          <div class="yoy-val cyan">${raffle['total_raised']:,.0f}</div>
+          <div class="yoy-sub">{raffle['total_tickets']:,} tickets · {raffle['buyer_count']} buyers</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card chart-card-line">
+      <div class="chart-title">Cumulative Sales - {raffle['prev_year']} (full year) vs {raffle['year']} (to date)</div>
+      <canvas id="{raffle['slug']}-lineChart" style="max-height:360px"></canvas>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">Returning Buyers</span>
+        <span class="badge-count">{raffle['n_returning']}</span>
+      </div>
+      <p class="sec-desc">Bought tickets in both {raffle['prev_year']} and {raffle['year']}.</p>
+      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone..." oninput="filterTable('tbl-{raffle['slug']}-ret', this.value)" /></div>
+      <div class="tbl-wrap">
+        <table id="tbl-{raffle['slug']}-ret" class="ret-tbl">
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Phone</th>
+            <th class="r">{raffle['prev_year']} Tix</th><th class="r">{raffle['prev_year']} Paid</th>
+            <th class="r">{raffle['year']} Tix</th><th class="r">{raffle['year']} Paid</th>
+          </tr></thead>
+          <tbody>{raffle['rows_returning']}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">Prospects</span>
+        <span class="badge-count">{raffle['n_prospects']}</span>
+      </div>
+      <p class="sec-desc">Bought in {raffle['prev_year']} but not yet seen in {raffle['year']}.</p>
+      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone..." oninput="filterTable('tbl-{raffle['slug']}-pro', this.value)" /></div>
+      <div class="tbl-wrap">
+        <table id="tbl-{raffle['slug']}-pro" class="ret-tbl">
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Phone</th>
+            <th class="r">{raffle['prev_year']} Tix</th><th class="r">{raffle['prev_year']} Paid</th>
+          </tr></thead>
+          <tbody>{raffle['rows_prospects']}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">New {raffle['year']} Buyers</span>
+        <span class="badge-count">{raffle['n_new']}</span>
+      </div>
+      <p class="sec-desc">Purchased in {raffle['year']} with no record found in {raffle['prev_year']}.</p>
+      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone..." oninput="filterTable('tbl-{raffle['slug']}-new', this.value)" /></div>
+      <div class="tbl-wrap">
+        <table id="tbl-{raffle['slug']}-new" class="ret-tbl">
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Phone</th>
+            <th class="r">{raffle['year']} Tix</th><th class="r">{raffle['year']} Paid</th>
+          </tr></thead>
+          <tbody>{raffle['rows_new']}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>"""
+
+    def render_raffle_page(raffle: dict, active: bool) -> str:
+        history_button = ""
+        if raffle["has_history"]:
+            history_button = f'<button class="tab-btn" onclick="switchTab(\'{raffle["slug"]}\', \'retention\', this)">Retention &amp; YoY</button>'
+
+        dashboard_note = ""
+        if not raffle["has_history"]:
+            dashboard_note = (
+                '<div class="section section-note">'
+                '<div class="sec-hdr"><span class="sec-title">Fresh Raffle</span></div>'
+                f'<p class="sec-desc">{esc(raffle["raffle_name"])} is running without prior-year comparison data, so this page focuses on live totals and sales mix only.</p>'
+                '</div>'
+            )
+
+        return f"""
+  <section class="raffle-page{' active' if active else ''}" data-raffle-page="{raffle['slug']}">
+    <div class="raffle-hero">
+      <div>
+        <div class="eyebrow">Live Raffle View</div>
+        <h2>{esc(raffle['raffle_name'])}</h2>
+        <p>{raffle['year']} totals and sales details{'' if raffle['has_history'] else ' with current-year reporting only'}.</p>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-label">Tickets Sold</span>
+        <span class="hero-stat-value">{raffle['total_tickets']}</span>
+      </div>
+    </div>
+
+    <div class="tabs tabs-inner">
+      <button class="tab-btn active" onclick="switchTab('{raffle['slug']}', 'dashboard', this)">Dashboard</button>
+      {history_button}
+    </div>
+
+    <div id="tab-{raffle['slug']}-dashboard" class="tab-panel active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Total Raised</div>
+          <div class="card-value gold">${raffle['total_raised']:,.0f}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Tickets Sold</div>
+          <div class="card-value cyan">{raffle['total_tickets']}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Buyers</div>
+          <div class="card-value purp">{raffle['buyer_count']}</div>
+        </div>
+      </div>
+
+      {render_goal_block(raffle)}
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Daily Sales ($)</div>
+          <canvas id="{raffle['slug']}-barChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Ticket Tier Mix</div>
+          <canvas id="{raffle['slug']}-donutChart"></canvas>
+        </div>
+      </div>
+
+      <div class="leaderboard">
+        <div class="lb-title">Top Supporters</div>
+        <table>
+          <tbody>{render_top5_rows(raffle)}</tbody>
+        </table>
+      </div>
+
+      {dashboard_note}
+    </div>
+
+    {render_retention_panel(raffle)}
+  </section>"""
+
+    def render_raffle_switch(raffle: dict, active: bool) -> str:
+      active_class = " active" if active else ""
+      return (
+        f'<button class="raffle-switch{active_class}" data-raffle-btn="{raffle["slug"]}" '
+        f'onclick="switchRaffle(\'{raffle["slug"]}\', this)">'
+        f'{esc(raffle["raffle_short_name"])}'
+        f'<span>{esc(raffle["raffle_name"])} totals</span>'
+        '</button>'
+      )
+
+    raffle_switcher = "".join(
+      render_raffle_switch(raffle, idx == 0)
+      for idx, raffle in enumerate(raffles)
     )
-    arrow     = "▲" if d["pct_diff"] >= 0 else "▼"
-    arrow_cls = "up" if d["pct_diff"] >= 0 else "dn"
-    badge_cls = "badge-up" if d["pct_diff"] >= 0 else "badge-dn"
-    sign      = "+" if d["pct_diff"] >= 0 else ""
+    raffle_pages = "".join(render_raffle_page(raffle, idx == 0) for idx, raffle in enumerate(raffles))
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sir Pork-a-Lot · Raffle Dashboard {d['year']}</title>
+  <title>Sir Pork-a-Lot · Multi-Raffle Dashboard {raffles[0]['year']}</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
     :root {{
@@ -683,6 +974,78 @@ def render_html(d: dict) -> str:
       max-width: 360px;
       margin: .75rem auto 0;
     }}
+    .raffle-switcher {{
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: .9rem;
+    }}
+    .raffle-switch {{
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: .15rem;
+      background: rgba(26,15,53,.78);
+      border: 1px solid rgba(192,132,252,.2);
+      border-radius: 1rem;
+      color: var(--text);
+      padding: 1rem 1.1rem;
+      cursor: pointer;
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }}
+    .raffle-switch span {{
+      color: var(--muted);
+      font-size: .74rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }}
+    .raffle-switch:hover {{
+      transform: translateY(-1px);
+      border-color: var(--cyan);
+    }}
+    .raffle-switch.active {{
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(0,229,255,.12), 0 0 18px rgba(0,229,255,.12);
+      background: rgba(0,229,255,.08);
+    }}
+    .raffle-page {{ display: none; }}
+    .raffle-page.active {{ display: block; }}
+    .raffle-hero {{
+      max-width: 960px;
+      margin: 0 auto 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 1rem;
+      padding: 1.4rem 1.55rem;
+      background: linear-gradient(135deg, rgba(255,0,204,.09), rgba(0,229,255,.08));
+      border: 1px solid rgba(192,132,252,.22);
+      border-radius: 1rem;
+    }}
+    .raffle-hero h2 {{
+      font-size: 1.45rem;
+      letter-spacing: .04em;
+      margin-bottom: .25rem;
+    }}
+    .raffle-hero p {{ color: var(--muted); font-size: .88rem; }}
+    .eyebrow {{
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-size: .68rem;
+      margin-bottom: .35rem;
+    }}
+    .hero-stat {{ text-align: right; min-width: 140px; }}
+    .hero-stat-label {{
+      display: block;
+      color: var(--muted);
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .18rem;
+    }}
+    .hero-stat-value {{ font-size: 2rem; font-weight: 800; color: var(--gold); }}
     /* ── Grid ── */
     .grid {{
       max-width: 960px;
@@ -761,6 +1124,8 @@ def render_html(d: dict) -> str:
       color: var(--muted);
       margin-top: .5rem;
     }}
+    .goal-card--empty {{ border-color: rgba(0,229,255,.22); }}
+    .goal-empty-copy {{ color: var(--muted); font-size: .88rem; margin-top: .45rem; }}
     /* ── Charts row ── */
     .charts-row {{
       max-width: 960px;
@@ -836,6 +1201,7 @@ def render_html(d: dict) -> str:
     }}
     .tab-panel {{ display: none; }}
     .tab-panel.active {{ display: block; }}
+    .tabs-inner {{ margin-bottom: 1.25rem; }}
     /* ── YoY card ── */
     .yoy-card {{
       max-width: 960px;
@@ -942,6 +1308,8 @@ def render_html(d: dict) -> str:
     .ret-tbl td.amt {{ font-weight: 700; color: var(--muted); }}
     .ret-tbl td.hi  {{ color: var(--cyan); text-shadow: 0 0 8px rgba(0,229,255,.4); font-weight: 700; }}
     .ret-tbl td.empty {{ text-align: center; color: var(--muted); padding: 1.5rem; font-style: italic; }}
+    .section-note {{ border-style: dashed; }}
+    .chart-card-line {{ max-width:960px; margin:0 auto 1.5rem; }}
     /* ── Footer ── */
     .footer {{
       text-align: center;
@@ -949,200 +1317,29 @@ def render_html(d: dict) -> str:
       font-size: .75rem;
       color: rgba(167,139,202,.4);
     }}
+    @media (max-width: 640px) {{
+      .raffle-hero {{ flex-direction: column; align-items: flex-start; }}
+      .hero-stat {{ text-align: left; }}
+      .goal-sub {{ flex-direction: column; gap: .25rem; }}
+    }}
   </style>
 </head>
 <body>
 
   <div class="header">
     <img src="https://sirporkalot.vercel.app/Photo_2.jpeg" alt="Sir Pork-a-Lot" />
-    <h1>Raffle Dashboard {d['year']}</h1>
-    <p class="sub">Hogs for the Cause · Last updated {d['updated_at']}</p>
+    <h1>Raffle Dashboard {raffles[0]['year']}</h1>
+    <p class="sub">Multi-raffle totals for Hogs for the Cause and CRNA Essential Bundle · Last updated {raffles[0]['updated_at']}</p>
     <div class="divider"></div>
   </div>
 
-  <!-- Tab navigation -->
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('dashboard', this)">📊 Dashboard</button>
-    <button class="tab-btn" onclick="switchTab('retention', this)">🔄 Retention &amp; YoY</button>
+  <div class="raffle-switcher">
+    {raffle_switcher}
   </div>
 
-  <!-- ═══════════════════════════════════════════════ DASHBOARD TAB ══ -->
-  <div id="tab-dashboard" class="tab-panel active">
+  {raffle_pages}
 
-  <!-- Stat cards -->
-  <div class="grid">
-    <div class="card">
-      <div class="card-label">💰 Total Raised</div>
-      <div class="card-value gold">${d['total_raised']:,.0f}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">🎟️ Tickets Sold</div>
-      <div class="card-value cyan">{d['total_tickets']}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">👥 Total Buyers</div>
-      <div class="card-value purp">{d['buyer_count']}</div>
-    </div>
-</div>
-
-  <!-- Goal progress -->
-  <div class="goal-card">
-    <div class="goal-header">
-      <span class="goal-title">🎯 Goal Progress — ${d['goal']:,}</span>
-      <span class="goal-pct">{d['pct']}%</span>
-    </div>
-    <div class="bar-track"><div class="bar-fill"></div></div>
-    <div class="goal-sub">
-      <span>${d['total_raised']:,.0f} raised</span>
-      <span>${d['goal'] - d['total_raised']:,.0f} to go</span>
-    </div>
-  </div>
-
-  <!-- Charts -->
-  <div class="charts-row">
-    <div class="chart-card">
-      <div class="chart-title">📅 Daily Sales ($)</div>
-      <canvas id="barChart"></canvas>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">🎟️ Ticket Tier Mix</div>
-      <canvas id="donutChart"></canvas>
-    </div>
-  </div>
-
-  <!-- Top buyers -->
-  <div class="leaderboard">
-    <div class="lb-title">🏆 Top Supporters</div>
-    <table>
-      <tbody>
-        {top5_rows if top5_rows else '<tr><td class="td-name" colspan="2" style="color:var(--muted);text-align:center">No data yet</td></tr>'}
-      </tbody>
-    </table>
-  </div>
-
-  </div><!-- /#tab-dashboard -->
-
-  <!-- ═══════════════════════════════════════════ RETENTION TAB ══ -->
-  <div id="tab-retention" class="tab-panel">
-
-    <!-- Retention stat chips -->
-    <div class="ret-grid">
-      <div class="ret-card">
-        <div class="ret-label">🎟 {d['year']} Buyers</div>
-        <div class="ret-val cyan">{d['buyer_count']}</div>
-      </div>
-      <div class="ret-card">
-        <div class="ret-label">🎟 {d['prev_year']} Buyers</div>
-        <div class="ret-val purp">{d['n_returning'] + d['n_prospects']}</div>
-      </div>
-      <div class="ret-card">
-        <div class="ret-label">🔄 Returning</div>
-        <div class="ret-val grn">{d['n_returning']}</div>
-        <div class="ret-sub">Retention: {d['ret_rate']}%</div>
-      </div>
-      <div class="ret-card">
-        <div class="ret-label">📢 Prospects</div>
-        <div class="ret-val gold">{d['n_prospects']}</div>
-        <div class="ret-sub">{d['prev_year']} buyers not yet in {d['year']}</div>
-      </div>
-      <div class="ret-card">
-        <div class="ret-label">✨ New Buyers</div>
-        <div class="ret-val pink">{d['n_new']}</div>
-        <div class="ret-sub">First-timers in {d['year']}</div>
-      </div>
-    </div>
-
-    <!-- YoY comparison -->
-    <div class="yoy-card">
-      <div class="yoy-title">📊 Year-over-Year — through {d['today']} vs same date in {d['prev_year']}</div>
-      <div class="yoy-grid">
-        <div class="yoy-col">
-          <div class="yoy-yr">{d['prev_year']} (through {d['same_day_prev']})</div>
-          <div class="yoy-val purp">${d['todate_prev_amt']:,.0f}</div>
-          <div class="yoy-sub">{d['todate_prev_tix']:,} tickets · {d['todate_prev_buyers']} buyers</div>
-        </div>
-        <div class="vs-col">
-          <div class="vs-arrow {arrow_cls}">{arrow}</div>
-          <div class="yoy-badge {badge_cls}">{sign}{d['pct_diff']}%</div>
-        </div>
-        <div class="yoy-col">
-          <div class="yoy-yr">{d['year']} (to date)</div>
-          <div class="yoy-val cyan">${d['total_raised']:,.0f}</div>
-          <div class="yoy-sub">{d['total_tickets']:,} tickets · {d['buyer_count']} buyers</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Cumulative line chart -->
-    <div class="chart-card" style="max-width:960px;margin:0 auto 1.5rem">
-      <div class="chart-title">📈 Cumulative Sales — {d['prev_year']} (full year) vs {d['year']} (to date)</div>
-      <canvas id="lineChart" style="max-height:360px"></canvas>
-    </div>
-
-    <!-- Returning buyers -->
-    <div class="section">
-      <div class="sec-hdr">
-        <span class="sec-title">🔄 Returning Buyers</span>
-        <span class="badge-count">{d['n_returning']}</span>
-      </div>
-      <p class="sec-desc">Bought tickets in both {d['prev_year']} and {d['year']}.</p>
-      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone…" oninput="filterTable('tbl-ret',this.value)" /></div>
-      <div class="tbl-wrap">
-        <table id="tbl-ret" class="ret-tbl">
-          <thead><tr>
-            <th>Name</th><th>Email</th><th>Phone</th>
-            <th class="r">{d['prev_year']} Tix</th><th class="r">{d['prev_year']} Paid</th>
-            <th class="r">{d['year']} Tix</th><th class="r">{d['year']} Paid</th>
-          </tr></thead>
-          <tbody>{d['rows_returning']}</tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Prospects -->
-    <div class="section">
-      <div class="sec-hdr">
-        <span class="sec-title">📢 Prospects — Solicit These Buyers</span>
-        <span class="badge-count">{d['n_prospects']}</span>
-      </div>
-      <p class="sec-desc">
-        Bought in {d['prev_year']} but <strong style="color:var(--gold)">not yet</strong> seen in {d['year']}.
-        Sorted by {d['prev_year']} spend — highest value first.
-      </p>
-      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone…" oninput="filterTable('tbl-pro',this.value)" /></div>
-      <div class="tbl-wrap">
-        <table id="tbl-pro" class="ret-tbl">
-          <thead><tr>
-            <th>Name</th><th>Email</th><th>Phone</th>
-            <th class="r">{d['prev_year']} Tix</th><th class="r">{d['prev_year']} Paid</th>
-          </tr></thead>
-          <tbody>{d['rows_prospects']}</tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- New buyers -->
-    <div class="section">
-      <div class="sec-hdr">
-        <span class="sec-title">✨ New {d['year']} Buyers (First-Timers)</span>
-        <span class="badge-count">{d['n_new']}</span>
-      </div>
-      <p class="sec-desc">Purchased in {d['year']} with no record found in {d['prev_year']}.</p>
-      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone…" oninput="filterTable('tbl-new',this.value)" /></div>
-      <div class="tbl-wrap">
-        <table id="tbl-new" class="ret-tbl">
-          <thead><tr>
-            <th>Name</th><th>Email</th><th>Phone</th>
-            <th class="r">{d['year']} Tix</th><th class="r">{d['year']} Paid</th>
-          </tr></thead>
-          <tbody>{d['rows_new']}</tbody>
-        </table>
-      </div>
-    </div>
-
-  </div><!-- /#tab-retention -->
-
-  <div class="footer">&copy; {d['year']} Team Sir Pork a Lot &mdash; Hogs for the Cause</div>
+  <div class="footer">&copy; {raffles[0]['year']} Team Sir Pork a Lot - unified raffle reporting</div>
 
   <script>
     const CYAN   = "#00e5ff";
@@ -1150,16 +1347,159 @@ def render_html(d: dict) -> str:
     const GOLD   = "#ffd700";
     const PURPLE = "#c084fc";
     const GREEN  = "#4ade80";
+    const chartData = {json.dumps(chart_payload)};
+    const chartRegistry = {{}};
 
-    // ── Tab switching ────────────────────────────────────────────────────
-    function switchTab(name, btn) {{
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('tab-' + name).classList.add('active');
-      btn.classList.add('active');
+    function ensureDashboardCharts(slug) {{
+      if (!chartRegistry[slug]) chartRegistry[slug] = {{}};
+      const cfg = chartData[slug];
+      if (!cfg) return;
+
+      if (!chartRegistry[slug].bar) {{
+        const barCanvas = document.getElementById(slug + '-barChart');
+        if (barCanvas) {{
+          chartRegistry[slug].bar = new Chart(barCanvas, {{
+            type: 'bar',
+            data: {{
+              labels: cfg.daily_labels,
+              datasets: [{{
+                label: 'Daily Sales ($)',
+                data: cfg.daily_values,
+                backgroundColor: 'rgba(0,229,255,.25)',
+                borderColor: CYAN,
+                borderWidth: 2,
+                borderRadius: 6,
+              }}]
+            }},
+            options: {{
+              responsive: true,
+              plugins: {{ legend: {{ display: false }} }},
+              scales: {{
+                x: {{ ticks: {{ color: '#a78bca', maxRotation: 45 }}, grid: {{ color: 'rgba(192,132,252,.1)' }} }},
+                y: {{ ticks: {{ color: '#a78bca', callback: v => '$' + v }}, grid: {{ color: 'rgba(192,132,252,.1)' }} }}
+              }}
+            }}
+          }});
+        }}
+      }}
+
+      if (!chartRegistry[slug].donut) {{
+        const donutCanvas = document.getElementById(slug + '-donutChart');
+        if (donutCanvas) {{
+          chartRegistry[slug].donut = new Chart(donutCanvas, {{
+            type: 'doughnut',
+            data: {{
+              labels: cfg.tier_labels,
+              datasets: [{{
+                data: cfg.tier_values,
+                backgroundColor: [CYAN, PINK, GOLD, PURPLE],
+                borderColor: '#0f0820',
+                borderWidth: 3,
+                hoverOffset: 8,
+              }}]
+            }},
+            options: {{
+              responsive: true,
+              plugins: {{
+                legend: {{ position: 'bottom', labels: {{ color: '#a78bca', padding: 14, font: {{ size: 11 }} }} }},
+              }}
+            }}
+          }});
+        }}
+      }}
+
+      Object.values(chartRegistry[slug]).forEach(chart => chart && chart.resize());
     }}
 
-    // ── Table search ─────────────────────────────────────────────────────
+    function ensureRetentionCharts(slug) {{
+      if (!chartRegistry[slug]) chartRegistry[slug] = {{}};
+      const cfg = chartData[slug];
+      if (!cfg || !cfg.has_history || chartRegistry[slug].line) return;
+
+      const canvas = document.getElementById(slug + '-lineChart');
+      if (!canvas) return;
+
+      const tickLabels = cfg.chart_master_labels.map((label, index) => (index % 14 === 0 ? label : ''));
+      chartRegistry[slug].line = new Chart(canvas, {{
+        type: 'line',
+        data: {{
+          labels: cfg.chart_master_labels,
+          datasets: [
+            {{
+              label: cfg.prev_year + ' Cumulative ($)',
+              data: cfg.chart_prev,
+              borderColor: PURPLE,
+              backgroundColor: 'rgba(192,132,252,.07)',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: false,
+              spanGaps: false,
+            }},
+            {{
+              label: cfg.year + ' Cumulative ($)',
+              data: cfg.chart_cur,
+              borderColor: CYAN,
+              backgroundColor: 'rgba(0,229,255,.07)',
+              borderWidth: 2.5,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: false,
+              spanGaps: false,
+            }},
+            {{
+              label: 'Today',
+              data: cfg.chart_master_labels.map((label, index) => {{
+                if (label !== cfg.today_mmdd) return null;
+                return Math.max(cfg.chart_prev[index] || 0, cfg.chart_cur[index] || 0) * 1.05;
+              }}),
+              borderColor: 'rgba(255,215,0,.7)',
+              borderWidth: 1.5,
+              borderDash: [4, 4],
+              pointRadius: 6,
+              pointStyle: 'line',
+              pointBorderColor: GOLD,
+              showLine: false,
+              spanGaps: false,
+            }},
+          ],
+        }},
+        options: {{
+          responsive: true,
+          interaction: {{ mode: 'index', intersect: false }},
+          plugins: {{
+            legend: {{ position: 'top', labels: {{ color: '#a78bca', font: {{ size: 11 }}, padding: 16 }} }},
+            tooltip: {{ callbacks: {{ label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toLocaleString() }} }},
+          }},
+          scales: {{
+            x: {{ ticks: {{ color: '#a78bca', maxRotation: 45, callback: (value, index) => tickLabels[index] }}, grid: {{ color: 'rgba(192,132,252,.08)' }} }},
+            y: {{ ticks: {{ color: '#a78bca', callback: value => '$' + value.toLocaleString() }}, grid: {{ color: 'rgba(192,132,252,.08)' }} }},
+          }},
+        }}
+      }});
+      chartRegistry[slug].line.resize();
+    }}
+
+    function switchRaffle(slug, btn) {{
+      document.querySelectorAll('[data-raffle-page]').forEach(page => page.classList.remove('active'));
+      document.querySelectorAll('[data-raffle-btn]').forEach(button => button.classList.remove('active'));
+      document.querySelector('[data-raffle-page="' + slug + '"]').classList.add('active');
+      btn.classList.add('active');
+      ensureDashboardCharts(slug);
+      const activeTab = document.querySelector('[data-raffle-page="' + slug + '"] .tab-panel.active');
+      if (activeTab && activeTab.id.endsWith('-retention')) ensureRetentionCharts(slug);
+    }}
+
+    function switchTab(slug, name, btn) {{
+      const page = document.querySelector('[data-raffle-page="' + slug + '"]');
+      page.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+      page.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
+      page.querySelector('#tab-' + slug + '-' + name).classList.add('active');
+      btn.classList.add('active');
+      if (name === 'dashboard') ensureDashboardCharts(slug);
+      if (name === 'retention') ensureRetentionCharts(slug);
+    }}
+
     function filterTable(tableId, query) {{
       const q = query.toLowerCase().trim();
       document.querySelectorAll('#' + tableId + ' tbody tr').forEach(tr => {{
@@ -1168,105 +1508,9 @@ def render_html(d: dict) -> str:
       }});
     }}
 
-    // ── Cumulative line chart ─────────────────────────────────────────────
-    const MASTER_LABELS = {d['chart_master_labels']};
-    const DATA_PREV     = {d['chart_prev']};
-    const DATA_CUR      = {d['chart_cur']};
-    const TODAY_MMDD    = {d['today_mmdd']};
-    const tickLabels    = MASTER_LABELS.map((l, i) => (i % 14 === 0 ? l : ""));
-
-    new Chart(document.getElementById("lineChart"), {{
-      type: "line",
-      data: {{
-        labels: MASTER_LABELS,
-        datasets: [
-          {{
-            label: "{d['prev_year']} Cumulative ($)",
-            data: DATA_PREV,
-            borderColor: PURPLE, backgroundColor: "rgba(192,132,252,.07)",
-            borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, spanGaps: false,
-          }},
-          {{
-            label: "{d['year']} Cumulative ($)",
-            data: DATA_CUR,
-            borderColor: CYAN, backgroundColor: "rgba(0,229,255,.07)",
-            borderWidth: 2.5, pointRadius: 0, tension: 0.3, fill: false, spanGaps: false,
-          }},
-          {{
-            label: "Today",
-            data: MASTER_LABELS.map((l, i) => {{
-              if (l !== TODAY_MMDD) return null;
-              return Math.max(DATA_PREV[i] || 0, DATA_CUR[i] || 0) * 1.05;
-            }}),
-            borderColor: "rgba(255,215,0,.7)", borderWidth: 1.5,
-            borderDash: [4,4], pointRadius: 6, pointStyle: "line",
-            pointBorderColor: GOLD, showLine: false, spanGaps: false,
-          }},
-        ],
-      }},
-      options: {{
-        responsive: true,
-        interaction: {{ mode: "index", intersect: false }},
-        plugins: {{
-          legend: {{ position: "top", labels: {{ color: "#a78bca", font: {{ size: 11 }}, padding: 16 }} }},
-          tooltip: {{ callbacks: {{ label: ctx => ctx.dataset.label + ": $" + (ctx.parsed.y||0).toLocaleString() }} }},
-        }},
-        scales: {{
-          x: {{
-            ticks: {{ color: "#a78bca", maxRotation: 45, callback: (v,i) => tickLabels[i] }},
-            grid:  {{ color: "rgba(192,132,252,.08)" }},
-          }},
-          y: {{
-            ticks: {{ color: "#a78bca", callback: v => "$" + v.toLocaleString() }},
-            grid:  {{ color: "rgba(192,132,252,.08)" }},
-          }},
-        }},
-      }},
-    }});
-
-    // Bar chart — daily sales
-    new Chart(document.getElementById("barChart"), {{
-      type: "bar",
-      data: {{
-        labels: {json.dumps(d['daily_labels'])},
-        datasets: [{{
-          label: "Daily Sales ($)",
-          data: {json.dumps(d['daily_values'])},
-          backgroundColor: "rgba(0,229,255,.25)",
-          borderColor: CYAN,
-          borderWidth: 2,
-          borderRadius: 6,
-        }}]
-      }},
-      options: {{
-        responsive: true,
-        plugins: {{ legend: {{ display: false }} }},
-        scales: {{
-          x: {{ ticks: {{ color: "#a78bca", maxRotation: 45 }}, grid: {{ color: "rgba(192,132,252,.1)" }} }},
-          y: {{ ticks: {{ color: "#a78bca", callback: v => "$" + v }}, grid: {{ color: "rgba(192,132,252,.1)" }} }}
-        }}
-      }}
-    }});
-
-    // Donut chart — tier mix
-    new Chart(document.getElementById("donutChart"), {{
-      type: "doughnut",
-      data: {{
-        labels: {json.dumps(d['tier_labels'])},
-        datasets: [{{
-          data: {json.dumps(d['tier_values'])},
-          backgroundColor: [CYAN, PINK, GOLD, PURPLE],
-          borderColor: "#0f0820",
-          borderWidth: 3,
-          hoverOffset: 8,
-        }}]
-      }},
-      options: {{
-        responsive: true,
-        plugins: {{
-          legend: {{ position: "bottom", labels: {{ color: "#a78bca", padding: 14, font: {{ size: 11 }} }} }},
-        }}
-      }}
+    document.addEventListener('DOMContentLoaded', () => {{
+      const firstSlug = {json.dumps(raffles[0]['slug'])};
+      ensureDashboardCharts(firstSlug);
     }});
   </script>
 </body>
@@ -1285,18 +1529,24 @@ def main():
     print("Fetching all list items (all years)...")
     all_items = get_list_items(token, site_id)
 
+    unique_raffles = sorted({str((item.get("fields") or {}).get("RaffleName") or "") for item in all_items})
+    print(f"  Unique RaffleName values: {unique_raffles}")
+
     print(f"Loading {PREV_YEAR} CSV...")
     csv_rows = load_csv_prev()
 
-    print("Processing data...")
-    data = process(all_items, csv_rows)
-    print(
-        f"  {CURRENT_YEAR}: ${data['total_raised']:,.0f} raised  "
-        f"({data['n_returning']} returning, {data['n_prospects']} prospects, {data['n_new']} new)"
-    )
+    print("Processing raffle data...")
+    hogs_data = process_raffle(all_items, "hogs_for_the_cause", csv_rows)
+    crna_data = process_raffle(all_items, "crna_essential_bundle")
+    report_data = {
+      "hogs_for_the_cause": hogs_data,
+      "crna_essential_bundle": crna_data,
+    }
+    print(f"  Hogs: ${hogs_data['total_raised']:,.0f} raised, {hogs_data['total_tickets']} tickets")
+    print(f"  CRNA: ${crna_data['total_raised']:,.0f} raised, {crna_data['total_tickets']} tickets")
 
     print("Rendering HTML...")
-    html = render_html(data)
+    html = render_html(report_data)
 
     out_dir = os.path.join(os.path.dirname(__file__), "dist")
     os.makedirs(out_dir, exist_ok=True)
@@ -1306,7 +1556,7 @@ def main():
     print(f"  Saved to {out_path}")
 
     print("Writing Excel report...")
-    xlsx_path = write_excel(data, out_dir)
+    xlsx_path = write_excel(hogs_data, out_dir)
     print(f"  Saved to {xlsx_path}")
 
 if __name__ == "__main__":
