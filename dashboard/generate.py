@@ -149,8 +149,8 @@ RAFFLE_CONFIGS = {
     },
     "crna_essential_bundle": {
         "slug": "crna",
-        "display_name": "CRNA Essential Bundle",
-        "short_name": "CRNA Bundle",
+      "display_name": "APEX CRNA Essential Bundle",
+      "short_name": "APEX CRNA Bundle",
         "goal": CRNA_GOAL,
         "include_history": False,
     },
@@ -1315,7 +1315,7 @@ def render_html(report_data: dict[str, dict]) -> str:
   <div class="header">
     <img src="https://sirporkalot.vercel.app/Photo_2.jpeg" alt="Sir Pork-a-Lot" />
     <h1>Raffle Dashboard {raffles[0]['year']}</h1>
-    <p class="sub">Multi-raffle totals for Hogs for the Cause and CRNA Essential Bundle · Last updated {raffles[0]['updated_at']}</p>
+    <p class="sub">Multi-raffle totals for Hogs for the Cause and APEX CRNA Essential Bundle · Last updated {raffles[0]['updated_at']}</p>
     <div class="divider"></div>
   </div>
 
