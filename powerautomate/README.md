@@ -116,3 +116,31 @@ You receive a confirmation email ✅
 | HTTP 404 from webhook | No matching pending order | Name in Venmo doesn't match name entered at checkout — update manually in Supabase |
 | Flow never triggers | Wrong sender filter | Verify Venmo emails arrive from `venmo@venmo.com` in your inbox |
 | Amount parse is wrong | Unexpected subject format | Test with a real Venmo email and adjust the `Extract_Amount` expression |
+
+---
+
+## One-time backfill from exported emails
+
+If the Outlook trigger was down and you need to process missed messages, do not rely on
+the trigger to replay old emails. Instead:
+
+1. Export the missed Outlook messages as `.eml` files into a local folder.
+2. Run:
+
+        ```bash
+        python dashboard/venmo_email_backfill.py --input path/to/exported-emails --output venmo_backfill.csv
+        ```
+
+3. Review rows where `ParseStatus = needs_review`.
+4. Import the CSV into SharePoint or use it as the source for a one-time Power Automate backfill flow.
+
+The CSV includes the same core fields used by the Venmo SharePoint flow:
+
+- `Title`
+- `Person`
+- `NumberofChances`
+- `PaymentReferenceID`
+- `TotalPaid`
+- `SubmissionDate`
+- `EmailAddress`
+- `RaffleName`
