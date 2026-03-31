@@ -218,6 +218,91 @@ class Buyer:
         )
 
 
+      def buyer_aliases(email: str, phone: str, name: str) -> list[str]:
+        aliases: list[str] = []
+        e = norm_email(email)
+        p = norm_phone(phone)
+        n = norm_name(name)
+        if e:
+          aliases.append(f"e:{e}")
+        if p:
+          aliases.append(f"p:{p}")
+        if n and n != "unknown":
+          aliases.append(f"n:{n}")
+        return aliases
+
+
+      def merge_buyer_records(target: Buyer, source: Buyer) -> None:
+        if not target.name and source.name:
+          target.name = source.name
+        if not target.email and source.email:
+          target.email = source.email
+        if not target.phone and source.phone:
+          target.phone = source.phone
+        target.tickets_2025 += source.tickets_2025
+        target.amount_2025 += source.amount_2025
+        target.tickets_2026 += source.tickets_2026
+        target.amount_2026 += source.amount_2026
+
+
+      def find_buyer(
+        buyer_map: dict[str, Buyer],
+        alias_map: dict[str, str],
+        email: str,
+        phone: str,
+        name: str,
+      ) -> Buyer | None:
+        for alias in buyer_aliases(email, phone, name):
+          canonical = alias_map.get(alias)
+          if canonical and canonical in buyer_map:
+            return buyer_map[canonical]
+        return None
+
+
+      def upsert_buyer(
+        buyer_map: dict[str, Buyer],
+        alias_map: dict[str, str],
+        canonical_aliases: dict[str, set[str]],
+        *,
+        name: str,
+        email: str,
+        phone: str,
+      ) -> tuple[str, Buyer]:
+        aliases = buyer_aliases(email, phone, name)
+        matching_keys: list[str] = []
+        for alias in aliases:
+          canonical = alias_map.get(alias)
+          if canonical and canonical in buyer_map and canonical not in matching_keys:
+            matching_keys.append(canonical)
+
+        if matching_keys:
+          canonical = matching_keys[0]
+          buyer = buyer_map[canonical]
+          for other in matching_keys[1:]:
+            merge_buyer_records(buyer, buyer_map.pop(other))
+            for alias in canonical_aliases.pop(other, set()):
+              alias_map[alias] = canonical
+              canonical_aliases.setdefault(canonical, set()).add(alias)
+        else:
+          canonical = aliases[0] if aliases else f"id:{len(buyer_map) + 1}"
+          buyer = Buyer(name=name, email=email, phone=phone)
+          buyer_map[canonical] = buyer
+          canonical_aliases[canonical] = set()
+
+        if not buyer.name and name:
+          buyer.name = name
+        if not buyer.email and email:
+          buyer.email = email
+        if not buyer.phone and phone:
+          buyer.phone = phone
+
+        for alias in aliases:
+          alias_map[alias] = canonical
+          canonical_aliases.setdefault(canonical, set()).add(alias)
+
+        return canonical, buyer
+
+
 # ── Core processing ───────────────────────────────────────────────────────────
 
 def process_data(sp_items: list[dict], csv_rows: list[dict]) -> dict:
@@ -241,15 +326,10 @@ def process_data(sp_items: list[dict], csv_rows: list[dict]) -> dict:
             sp25.append(f)
     print(f"  SharePoint — {PREV_YEAR}: {len(sp25)},  {CUR_YEAR}: {len(sp26)}")
 
-    # ── Helper: choose the best primary key for a buyer record ────────────────
-    def _key(email: str, phone: str, name: str) -> str:
-        e = norm_email(email)
-        p = norm_phone(phone)
-        n = norm_name(name)
-        return e if e else (p if p else n)
-
     # ── 2. Build 2026 buyer map ───────────────────────────────────────────────
     map26: dict[str, Buyer] = {}
+    aliases26: dict[str, str] = {}
+    canonical26: dict[str, set[str]] = {}
     daily26: dict[str, float] = defaultdict(float)
     total26_amount  = 0.0
     total26_tickets = 0
@@ -267,14 +347,21 @@ def process_data(sp_items: list[dict], csv_rows: list[dict]) -> dict:
         if day:
             daily26[day] += amount
 
-        k = _key(email, phone, name)
-        if k not in map26:
-            map26[k] = Buyer(name=name, email=email, phone=phone)
-        map26[k].tickets_2026 += tickets
-        map26[k].amount_2026  += amount
+        _, buyer = upsert_buyer(
+          map26,
+          aliases26,
+          canonical26,
+          name=name,
+          email=email,
+          phone=phone,
+        )
+        buyer.tickets_2026 += tickets
+        buyer.amount_2026 += amount
 
     # ── 3. Build 2025 buyer map from SharePoint ───────────────────────────────
     map25: dict[str, Buyer] = {}
+      aliases25: dict[str, str] = {}
+      canonical25: dict[str, set[str]] = {}
     daily25: dict[str, float] = defaultdict(float)
     total25_amount     = 0.0
     total25_tickets    = 0
@@ -286,6 +373,8 @@ def process_data(sp_items: list[dict], csv_rows: list[dict]) -> dict:
         name    = str(f.get("Person")            or "Unknown").strip()
         amount  = float(f.get("TotalPaid")        or 0)
         tickets = int(f.get("NumberofChances")    or 0)
+      if tickets == 0:
+        continue
         email   = str(f.get("Email")              or "").strip()
         phone   = str(f.get("Phone")              or "").strip()
         day     = (f.get("SubmissionDate")         or "")[:10]
@@ -298,101 +387,52 @@ def process_data(sp_items: list[dict], csv_rows: list[dict]) -> dict:
                 todate25_amount  += amount
                 todate25_tickets += tickets
 
-        k = _key(email, phone, name)
+          canonical_key, buyer = upsert_buyer(
+            map25,
+            aliases25,
+            canonical25,
+            name=name,
+            email=email,
+            phone=phone,
+          )
         if day and day <= str(SAME_DAY_PREV):
-            todate25_keys.add(k)
+            todate25_keys.add(canonical_key)
 
-        if k not in map25:
-            map25[k] = Buyer(name=name, email=email, phone=phone)
-        map25[k].tickets_2025 += tickets
-        map25[k].amount_2025  += amount
+          buyer.tickets_2025 += tickets
+          buyer.amount_2025 += amount
 
     # ── 4. Supplement 2025 map with CSV entries ───────────────────────────────
     for row in csv_rows:
-        e_n = norm_email(row["email"])
-        p_n = norm_phone(row["phone"])
-        n_n = norm_name(row["name"])
-
-        # Try to find an existing 2025 entry to enrich with email/phone
-        matched_key: str | None = None
-        if e_n and e_n in map25:
-            matched_key = e_n
-        elif p_n and p_n in map25:
-            matched_key = p_n
-        else:
-            for k, b in map25.items():
-                if norm_name(b.name) == n_n:
-                    matched_key = k
-                    break
-
-        if matched_key:
-            b = map25[matched_key]
-            if not b.email and row["email"]:
-                b.email = row["email"]
-            if not b.phone and row["phone"]:
-                b.phone = row["phone"]
-        else:
-            # CSV-only buyer (no corresponding SharePoint record)
-            k = e_n or p_n or n_n
-            if k and k not in map25:
-                map25[k] = Buyer(
-                    name=row["name"],
-                    email=row["email"],
-                    phone=row["phone"],
-                )
+      buyer = find_buyer(map25, aliases25, row["email"], row["phone"], row["name"])
+      if buyer:
+        if not buyer.email and row["email"]:
+          buyer.email = row["email"]
+        if not buyer.phone and row["phone"]:
+          buyer.phone = row["phone"]
 
     print(f"  Unique buyers — {PREV_YEAR}: {len(map25)},  {CUR_YEAR}: {len(map26)}")
 
     # ── 5. Cross-reference: returning vs. prospects ───────────────────────────
-    emails26 = {norm_email(b.email)  for b in map26.values() if b.email}
-    phones26 = {norm_phone(b.phone)  for b in map26.values() if b.phone}
-    names26  = {norm_name(b.name)    for b in map26.values()}
-
     returning: list[Buyer] = []
     prospects: list[Buyer] = []
 
     for _k, b25 in map25.items():
-        e = norm_email(b25.email)
-        p = norm_phone(b25.phone)
-        n = norm_name(b25.name)
-        is_returning = (
-            (e and e in emails26) or
-            (p and p in phones26) or
-            (n and n in names26)
-        )
-        if is_returning:
-            # Merge 2026 amounts onto the combined record
-            for b26 in map26.values():
-                e2 = norm_email(b26.email)
-                p2 = norm_phone(b26.phone)
-                n2 = norm_name(b26.name)
-                if (e and e2 and e == e2) or (p and p2 and p == p2) or n == n2:
-                    b25.tickets_2026 = b26.tickets_2026
-                    b25.amount_2026  = b26.amount_2026
-                    if not b25.email and b26.email:
-                        b25.email = b26.email
-                    if not b25.phone and b26.phone:
-                        b25.phone = b26.phone
-                    break
+          b26 = find_buyer(map26, aliases26, b25.email, b25.phone, b25.name)
+          if b26:
+            b25.tickets_2026 = b26.tickets_2026
+            b25.amount_2026 = b26.amount_2026
+            if not b25.email and b26.email:
+              b25.email = b26.email
+            if not b25.phone and b26.phone:
+              b25.phone = b26.phone
             returning.append(b25)
         else:
             prospects.append(b25)
 
     # New 2026 buyers (not matched in 2025 at all)
-    emails25 = {norm_email(b.email)  for b in map25.values() if b.email}
-    phones25 = {norm_phone(b.phone)  for b in map25.values() if b.phone}
-    names25  = {norm_name(b.name)    for b in map25.values()}
-
     new_buyers: list[Buyer] = []
     for _k, b26 in map26.items():
-        e = norm_email(b26.email)
-        p = norm_phone(b26.phone)
-        n = norm_name(b26.name)
-        if not (
-            (e and e in emails25) or
-            (p and p in phones25) or
-            (n and n in names25)
-        ):
+          if not find_buyer(map25, aliases25, b26.email, b26.phone, b26.name):
             new_buyers.append(b26)
 
     # Sort tables: returning/new by 2026 spend desc; prospects by 2025 spend desc

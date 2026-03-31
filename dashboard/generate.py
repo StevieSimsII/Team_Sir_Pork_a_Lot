@@ -138,6 +138,91 @@ class Buyer:
         self.amount_cur   = 0.0
 
 
+def buyer_aliases(email: str, phone: str, name: str) -> list[str]:
+  aliases: list[str] = []
+  email_key = norm_email(email)
+  phone_key = norm_phone(phone)
+  name_key = norm_name(name)
+  if email_key:
+    aliases.append(f"e:{email_key}")
+  if phone_key:
+    aliases.append(f"p:{phone_key}")
+  if name_key and name_key != "unknown":
+    aliases.append(f"n:{name_key}")
+  return aliases
+
+
+def merge_buyers(target: Buyer, source: Buyer) -> None:
+  if not target.name and source.name:
+    target.name = source.name
+  if not target.email and source.email:
+    target.email = source.email
+  if not target.phone and source.phone:
+    target.phone = source.phone
+  target.tickets_prev += source.tickets_prev
+  target.amount_prev += source.amount_prev
+  target.tickets_cur += source.tickets_cur
+  target.amount_cur += source.amount_cur
+
+
+def find_buyer(
+  buyer_map: dict[str, Buyer],
+  alias_map: dict[str, str],
+  email: str,
+  phone: str,
+  name: str,
+) -> Buyer | None:
+  for alias in buyer_aliases(email, phone, name):
+    canonical = alias_map.get(alias)
+    if canonical and canonical in buyer_map:
+      return buyer_map[canonical]
+  return None
+
+
+def upsert_buyer(
+  buyer_map: dict[str, Buyer],
+  alias_map: dict[str, str],
+  canonical_aliases: dict[str, set[str]],
+  *,
+  name: str,
+  email: str,
+  phone: str,
+) -> tuple[str, Buyer]:
+  aliases = buyer_aliases(email, phone, name)
+  matching_keys: list[str] = []
+  for alias in aliases:
+    canonical = alias_map.get(alias)
+    if canonical and canonical in buyer_map and canonical not in matching_keys:
+      matching_keys.append(canonical)
+
+  if matching_keys:
+    canonical = matching_keys[0]
+    buyer = buyer_map[canonical]
+    for other in matching_keys[1:]:
+      merge_buyers(buyer, buyer_map.pop(other))
+      for alias in canonical_aliases.pop(other, set()):
+        alias_map[alias] = canonical
+        canonical_aliases.setdefault(canonical, set()).add(alias)
+  else:
+    canonical = aliases[0] if aliases else f"id:{len(buyer_map) + 1}"
+    buyer = Buyer(name=name, email=email, phone=phone)
+    buyer_map[canonical] = buyer
+    canonical_aliases[canonical] = set()
+
+  if not buyer.name and name:
+    buyer.name = name
+  if not buyer.email and email:
+    buyer.email = email
+  if not buyer.phone and phone:
+    buyer.phone = phone
+
+  for alias in aliases:
+    alias_map[alias] = canonical
+    canonical_aliases.setdefault(canonical, set()).add(alias)
+
+  return canonical, buyer
+
+
 RAFFLE_CONFIGS = {
     "hogs_for_the_cause": {
         "slug": "hogs",
@@ -178,12 +263,6 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
   if include_history:
     print(f"    {PREV_YEAR}: {len(prev_fields)} prior-year items")
 
-  def _key(email: str, phone: str, name: str) -> str:
-    e = norm_email(email)
-    p = norm_phone(phone)
-    n = norm_name(name)
-    return e if e else (p if p else n)
-
   total_raised = 0.0
   total_tickets = 0
   buyers_cur: set[str] = set()
@@ -191,6 +270,8 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
   tier_counts: dict[int, int] = defaultdict(int)
   top_buyers: dict[str, float] = defaultdict(float)
   map_cur: dict[str, Buyer] = {}
+  aliases_cur: dict[str, str] = {}
+  canonical_cur: dict[str, set[str]] = {}
   daily_cur: dict[str, float] = defaultdict(float)
 
   for fields in cur_fields:
@@ -212,11 +293,16 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
       daily_totals[day] += amount
       daily_cur[day] += amount
 
-    buyer_key = _key(email, phone, person)
-    if buyer_key not in map_cur:
-      map_cur[buyer_key] = Buyer(name=person, email=email, phone=phone)
-    map_cur[buyer_key].tickets_cur += tickets
-    map_cur[buyer_key].amount_cur += amount
+    _, buyer = upsert_buyer(
+      map_cur,
+      aliases_cur,
+      canonical_cur,
+      name=person,
+      email=email,
+      phone=phone,
+    )
+    buyer.tickets_cur += tickets
+    buyer.amount_cur += amount
 
   sorted_days = sorted(daily_totals.keys())
   top5 = sorted(top_buyers.items(), key=lambda item: item[1], reverse=True)[:5]
@@ -224,6 +310,8 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
   tiers = [(tier_label_map.get(count, f"{count} Tickets"), total) for count, total in sorted(tier_counts.items())]
 
   map_prev: dict[str, Buyer] = {}
+  aliases_prev: dict[str, str] = {}
+  canonical_prev: dict[str, set[str]] = {}
   daily_prev: dict[str, float] = defaultdict(float)
   todate_prev_amt = 0.0
   todate_prev_tix = 0
@@ -232,6 +320,8 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
   for fields in prev_fields:
     amount = float(fields.get("TotalPaid", 0) or 0)
     tickets = int(fields.get("NumberofChances", 0) or 0)
+    if tickets == 0:
+      continue
     person = str(fields.get("Person", "Unknown") or "Unknown").strip()
     email = str(fields.get("Email", "") or "").strip()
     phone = str(fields.get("Phone", "") or "").strip()
@@ -243,84 +333,46 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
         todate_prev_amt += amount
         todate_prev_tix += tickets
 
-    buyer_key = _key(email, phone, person)
+    buyer_key, buyer = upsert_buyer(
+      map_prev,
+      aliases_prev,
+      canonical_prev,
+      name=person,
+      email=email,
+      phone=phone,
+    )
     if day and day <= str(SAME_DAY_PREV):
       todate_prev_keys.add(buyer_key)
-    if buyer_key not in map_prev:
-      map_prev[buyer_key] = Buyer(name=person, email=email, phone=phone)
-    map_prev[buyer_key].tickets_prev += tickets
-    map_prev[buyer_key].amount_prev += amount
+    buyer.tickets_prev += tickets
+    buyer.amount_prev += amount
 
   if include_history and csv_rows:
     for row in csv_rows:
-      email_key = norm_email(row["email"])
-      phone_key = norm_phone(row["phone"])
-      name_key = norm_name(row["name"])
-      matched_key = None
-
-      if email_key and email_key in map_prev:
-        matched_key = email_key
-      elif phone_key and phone_key in map_prev:
-        matched_key = phone_key
-      else:
-        for existing_key, buyer in map_prev.items():
-          if norm_name(buyer.name) == name_key:
-            matched_key = existing_key
-            break
-
-      if matched_key:
-        buyer = map_prev[matched_key]
+      buyer = find_buyer(map_prev, aliases_prev, row["email"], row["phone"], row["name"])
+      if buyer:
         if not buyer.email and row["email"]:
           buyer.email = row["email"]
         if not buyer.phone and row["phone"]:
           buyer.phone = row["phone"]
-      else:
-        fallback_key = email_key or phone_key or name_key
-        if fallback_key and fallback_key not in map_prev:
-          map_prev[fallback_key] = Buyer(name=row["name"], email=row["email"], phone=row["phone"])
-
-  emails_cur = {norm_email(buyer.email) for buyer in map_cur.values() if buyer.email}
-  phones_cur = {norm_phone(buyer.phone) for buyer in map_cur.values() if buyer.phone}
-  names_cur = {norm_name(buyer.name) for buyer in map_cur.values()}
-  emails_prev = {norm_email(buyer.email) for buyer in map_prev.values() if buyer.email}
-  phones_prev = {norm_phone(buyer.phone) for buyer in map_prev.values() if buyer.phone}
-  names_prev = {norm_name(buyer.name) for buyer in map_prev.values()}
 
   returning: list[Buyer] = []
   prospects: list[Buyer] = []
   for buyer in map_prev.values():
-    email_key = norm_email(buyer.email)
-    phone_key = norm_phone(buyer.phone)
-    name_key = norm_name(buyer.name)
-    is_returning = (
-      (email_key and email_key in emails_cur)
-      or (phone_key and phone_key in phones_cur)
-      or (name_key and name_key in names_cur)
-    )
-    if is_returning:
-      for current_buyer in map_cur.values():
-        email_match = email_key and norm_email(current_buyer.email) == email_key
-        phone_match = phone_key and norm_phone(current_buyer.phone) == phone_key
-        name_match = norm_name(current_buyer.name) == name_key
-        if email_match or phone_match or name_match:
-          buyer.tickets_cur = current_buyer.tickets_cur
-          buyer.amount_cur = current_buyer.amount_cur
-          if not buyer.email and current_buyer.email:
-            buyer.email = current_buyer.email
-          if not buyer.phone and current_buyer.phone:
-            buyer.phone = current_buyer.phone
-          break
+    current_buyer = find_buyer(map_cur, aliases_cur, buyer.email, buyer.phone, buyer.name)
+    if current_buyer:
+      buyer.tickets_cur = current_buyer.tickets_cur
+      buyer.amount_cur = current_buyer.amount_cur
+      if not buyer.email and current_buyer.email:
+        buyer.email = current_buyer.email
+      if not buyer.phone and current_buyer.phone:
+        buyer.phone = current_buyer.phone
       returning.append(buyer)
     else:
       prospects.append(buyer)
 
   new_buyers = [
     buyer for buyer in map_cur.values()
-    if not (
-      (norm_email(buyer.email) and norm_email(buyer.email) in emails_prev)
-      or (norm_phone(buyer.phone) and norm_phone(buyer.phone) in phones_prev)
-      or (norm_name(buyer.name) and norm_name(buyer.name) in names_prev)
-    )
+    if not find_buyer(map_prev, aliases_prev, buyer.email, buyer.phone, buyer.name)
   ]
 
   returning.sort(key=lambda buyer: buyer.amount_cur, reverse=True)
@@ -378,7 +430,7 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
       f'<tr data-search="{esc(buyer.name)} {esc(buyer.email)} {phone}">'
       f'<td>{esc(buyer.name)}</td><td>{_email_link(buyer.email)}</td><td>{phone}</td>'
       f'<td class="r">{buyer.tickets_prev or "—"}</td>'
-      f'<td class="r amt">${buyer.amount_prev:,.0f}</td>'
+      f'<td class="r amt">{f"${buyer.amount_prev:,.0f}" if buyer.amount_prev else "—"}</td>'
       f'</tr>'
     )
 
