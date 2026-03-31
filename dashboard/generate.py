@@ -303,9 +303,10 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
     buyer.amount_cur += amount
 
   sorted_days = sorted(daily_totals.keys())
-  top5 = [
+  top_supporters = [
     (buyer.name, buyer.amount_cur)
-    for buyer in sorted(map_cur.values(), key=lambda buyer: buyer.amount_cur, reverse=True)[:5]
+    for buyer in sorted(map_cur.values(), key=lambda buyer: buyer.amount_cur, reverse=True)
+    if buyer.amount_cur >= 100
   ]
   tier_label_map = {1: "1 Ticket ($25)", 3: "3 Tickets ($60)", 6: "6 Tickets ($100)", 12: "12 Tickets ($200)"}
   tiers = [(tier_label_map.get(count, f"{count} Tickets"), total) for count, total in sorted(tier_counts.items())]
@@ -468,7 +469,7 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
     "daily_values": [daily_totals[day] for day in sorted_days],
     "tier_labels": [tier[0] for tier in tiers],
     "tier_values": [tier[1] for tier in tiers],
-    "top5": top5,
+    "top_supporters": top_supporters,
     "goal": goal,
     "pct": goal_pct,
     "goal_remaining": goal_remaining,
@@ -726,10 +727,10 @@ def render_html(report_data: dict[str, dict]) -> str:
     </div>
   </div>"""
 
-    def render_top5_rows(raffle: dict) -> str:
+    def render_top_supporter_rows(raffle: dict) -> str:
         rows = "".join(
             f'<tr><td class="td-name">{esc(name)}</td><td class="td-amount">${amt:,.0f}</td></tr>'
-            for name, amt in raffle["top5"]
+        for name, amt in raffle["top_supporters"]
         )
         if rows:
             return rows
@@ -924,9 +925,9 @@ def render_html(report_data: dict[str, dict]) -> str:
       </div>
 
       <div class="leaderboard">
-        <div class="lb-title">Top Supporters</div>
+        <div class="lb-title">Current-Year Supporters ($100+)</div>
         <table>
-          <tbody>{render_top5_rows(raffle)}</tbody>
+          <tbody>{render_top_supporter_rows(raffle)}</tbody>
         </table>
       </div>
 
