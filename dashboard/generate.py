@@ -496,7 +496,7 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
     "_returning": returning,
     "_prospects": prospects,
     "_new_buyers": new_buyers,
-    "_top5": top5,
+    "_top_supporters": top_supporters,
     "_daily_labels": sorted_days,
     "_daily_values": [daily_totals[day] for day in sorted_days],
   }
