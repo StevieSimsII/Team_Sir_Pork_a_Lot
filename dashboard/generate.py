@@ -268,7 +268,6 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
   buyers_cur: set[str] = set()
   daily_totals: dict[str, float] = defaultdict(float)
   tier_counts: dict[int, int] = defaultdict(int)
-  top_buyers: dict[str, float] = defaultdict(float)
   map_cur: dict[str, Buyer] = {}
   aliases_cur: dict[str, str] = {}
   canonical_cur: dict[str, set[str]] = {}
@@ -287,7 +286,6 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
     total_raised += amount
     total_tickets += tickets
     buyers_cur.add(person.lower())
-    top_buyers[person] += amount
     tier_counts[tickets] += 1
     if day:
       daily_totals[day] += amount
@@ -305,7 +303,10 @@ def process_raffle(all_items: list[dict], raffle_key: str, csv_rows: list[dict] 
     buyer.amount_cur += amount
 
   sorted_days = sorted(daily_totals.keys())
-  top5 = sorted(top_buyers.items(), key=lambda item: item[1], reverse=True)[:5]
+  top5 = [
+    (buyer.name, buyer.amount_cur)
+    for buyer in sorted(map_cur.values(), key=lambda buyer: buyer.amount_cur, reverse=True)[:5]
+  ]
   tier_label_map = {1: "1 Ticket ($25)", 3: "3 Tickets ($60)", 6: "6 Tickets ($100)", 12: "12 Tickets ($200)"}
   tiers = [(tier_label_map.get(count, f"{count} Tickets"), total) for count, total in sorted(tier_counts.items())]
 
