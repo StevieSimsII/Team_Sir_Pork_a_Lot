@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sir Pork-a-Lot · Multi-Raffle Dashboard 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:      #0f0820;
+      --card:    #1a0f35;
+      --cyan:    #00e5ff;
+      --pink:    #ff00cc;
+      --gold:    #ffd700;
+      --purple:  #c084fc;
+      --grn:     #4ade80;
+      --red:     #f87171;
+      --text:    #f0e6ff;
+      --muted:   #a78bca;
+      --border:  rgba(192,132,252,.22);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(ellipse at 50% 0%, rgba(160,80,255,.22) 0%, transparent 55%),
+                  linear-gradient(180deg, #0f0820 0%, #1a0d35 100%);
+      min-height: 100vh;
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 2rem 1rem 4rem;
+    }
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .header img {
+      width: 140px;
+      mix-blend-mode: screen;
+      filter: drop-shadow(0 0 28px rgba(255,0,204,.65));
+      margin-bottom: .75rem;
+    }
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--purple);
+    }
+    .header .sub {
+      font-size: .9rem;
+      color: var(--muted);
+      margin-top: .25rem;
+    }
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--pink), var(--cyan), var(--pink), transparent);
+      box-shadow: 0 0 8px rgba(255,0,204,.5);
+      max-width: 360px;
+      margin: .75rem auto 0;
+    }
+    .raffle-switcher {
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: .9rem;
+    }
+    .raffle-switch {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: .15rem;
+      background: rgba(26,15,53,.78);
+      border: 1px solid rgba(192,132,252,.2);
+      border-radius: 1rem;
+      color: var(--text);
+      padding: 1rem 1.1rem;
+      cursor: pointer;
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    .raffle-switch span {
+      color: var(--muted);
+      font-size: .74rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .raffle-switch:hover {
+      transform: translateY(-1px);
+      border-color: var(--cyan);
+    }
+    .raffle-switch.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(0,229,255,.12), 0 0 18px rgba(0,229,255,.12);
+      background: rgba(0,229,255,.08);
+    }
+    .raffle-page { display: none; }
+    .raffle-page.active { display: block; }
+    .raffle-hero {
+      max-width: 960px;
+      margin: 0 auto 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 1rem;
+      padding: 1.4rem 1.55rem;
+      background: linear-gradient(135deg, rgba(255,0,204,.09), rgba(0,229,255,.08));
+      border: 1px solid rgba(192,132,252,.22);
+      border-radius: 1rem;
+    }
+    .raffle-hero h2 {
+      font-size: 1.45rem;
+      letter-spacing: .04em;
+      margin-bottom: .25rem;
+    }
+    .raffle-hero p { color: var(--muted); font-size: .88rem; }
+    .eyebrow {
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-size: .68rem;
+      margin-bottom: .35rem;
+    }
+    .hero-stat { text-align: right; min-width: 140px; }
+    .hero-stat-label {
+      display: block;
+      color: var(--muted);
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .18rem;
+    }
+    .hero-stat-value { font-size: 2rem; font-weight: 800; color: var(--gold); }
+    /* ── Grid ── */
+    .grid {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .card {
+      background: rgba(26,15,53,.75);
+      border: 1px solid rgba(192,132,252,.25);
+      border-radius: 1rem;
+      padding: 1.4rem 1.5rem;
+    }
+    .card-label {
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: .4rem;
+    }
+    .card-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .cyan  { color: var(--cyan);   text-shadow: 0 0 12px rgba(0,229,255,.6); }
+    .gold  { color: var(--gold);   text-shadow: 0 0 12px rgba(255,215,0,.6); }
+    .pink  { color: var(--pink);   text-shadow: 0 0 12px rgba(255,0,204,.6); }
+    .purp  { color: var(--purple); text-shadow: 0 0 12px rgba(192,132,252,.6); }
+    /* ── Goal bar ── */
+    .goal-card {
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      background: rgba(26,15,53,.75);
+      border: 1px solid rgba(255,215,0,.3);
+      border-radius: 1rem;
+      padding: 1.4rem 1.75rem;
+    }
+    .goal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: .75rem;
+    }
+    .goal-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--gold);
+      text-shadow: 0 0 10px rgba(255,215,0,.6);
+    }
+    .goal-pct {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--gold);
+    }
+    .bar-track {
+      background: rgba(255,255,255,.07);
+      border-radius: 9999px;
+      height: 18px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #cc00aa, #ff00cc, #ffd700);
+      box-shadow: 0 0 16px rgba(255,0,204,.5);
+      transition: width .6s ease;
+      width: 0;
+    }
+    .goal-sub {
+      display: flex;
+      justify-content: space-between;
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: .5rem;
+    }
+    .goal-card--empty { border-color: rgba(0,229,255,.22); }
+    .goal-empty-copy { color: var(--muted); font-size: .88rem; margin-top: .45rem; }
+    /* ── Charts row ── */
+    .charts-row {
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 640px) {
+      .charts-row { grid-template-columns: 1fr; }
+    }
+    .chart-card {
+      background: rgba(26,15,53,.75);
+      border: 1px solid rgba(192,132,252,.25);
+      border-radius: 1rem;
+      padding: 1.25rem;
+    }
+    .chart-title {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    /* ── Top buyers ── */
+    .leaderboard {
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      background: rgba(26,15,53,.75);
+      border: 1px solid rgba(192,132,252,.25);
+      border-radius: 1rem;
+      padding: 1.4rem 1.75rem;
+    }
+    .lb-title {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    tr:not(:last-child) td { border-bottom: 1px solid rgba(192,132,252,.12); }
+    td { padding: .6rem .25rem; font-size: .95rem; }
+    .td-name   { color: var(--text); }
+    .td-amount { text-align: right; font-weight: 700; color: var(--cyan);
+                  text-shadow: 0 0 8px rgba(0,229,255,.4); }
+    /* ── Tabs ── */
+    .tabs {
+      max-width: 960px;
+      margin: 0 auto 1.25rem;
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: rgba(26,15,53,.8);
+      border: 1px solid rgba(192,132,252,.25);
+      border-radius: .6rem;
+      color: var(--muted);
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      padding: .45rem 1rem;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .tab-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .tab-btn.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(0,229,255,.08);
+      text-shadow: 0 0 8px rgba(0,229,255,.4);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .tabs-inner { margin-bottom: 1.25rem; }
+    /* ── YoY card ── */
+    .yoy-card {
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      background: rgba(26,15,53,.8);
+      border: 1px solid rgba(255,215,0,.28);
+      border-radius: 1rem;
+      padding: 1.4rem 1.75rem;
+    }
+    .yoy-title {
+      font-size: .85rem; font-weight: 700;
+      color: var(--gold); text-transform: uppercase;
+      letter-spacing: .1em; margin-bottom: 1rem;
+      text-shadow: 0 0 8px rgba(255,215,0,.5);
+    }
+    .yoy-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: .75rem;
+      align-items: center;
+    }
+    .yoy-col { text-align: center; }
+    .yoy-yr  { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: .2rem; }
+    .yoy-val { font-size: 1.55rem; font-weight: 800; }
+    .yoy-sub { font-size: .72rem; color: var(--muted); margin-top: .15rem; }
+    .vs-col  { text-align: center; }
+    .vs-arrow { font-size: 1.5rem; font-weight: 900; }
+    .yoy-badge {
+      display: inline-block; font-size: .8rem; font-weight: 700;
+      padding: .15rem .55rem; border-radius: 999px; margin-top: .3rem;
+    }
+    .badge-up { background: rgba(74,222,128,.15); color: var(--grn); border: 1px solid rgba(74,222,128,.3); }
+    .badge-dn { background: rgba(248,113,113,.12); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+    .up { color: var(--grn); text-shadow: 0 0 8px rgba(74,222,128,.4); }
+    .dn { color: var(--red); text-shadow: 0 0 8px rgba(248,113,113,.4); }
+    /* ── Retention stat chips ── */
+    .ret-grid {
+      max-width: 960px;
+      margin: 0 auto 1.25rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: .9rem;
+    }
+    .ret-card {
+      background: rgba(26,15,53,.8);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.1rem 1.25rem;
+    }
+    .ret-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: .3rem; }
+    .ret-val   { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+    .ret-sub   { font-size: .68rem; color: var(--muted); margin-top: .25rem; }
+    .grn { color: var(--grn); text-shadow: 0 0 10px rgba(74,222,128,.55); }
+    /* ── Section panels ── */
+    .section {
+      max-width: 960px;
+      margin: 0 auto 1.5rem;
+      background: rgba(26,15,53,.8);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.4rem 1.75rem;
+    }
+    .sec-hdr {
+      display: flex; align-items: baseline; gap: .6rem; margin-bottom: .75rem;
+    }
+    .sec-title {
+      font-size: .78rem; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--muted);
+    }
+    .badge-count {
+      font-size: .72rem; font-weight: 700;
+      padding: .1rem .45rem; border-radius: 999px;
+      background: rgba(192,132,252,.18);
+      color: var(--purple); border: 1px solid rgba(192,132,252,.3);
+    }
+    .sec-desc { font-size: .78rem; color: var(--muted); margin-bottom: .85rem; }
+    .search-wrap { margin-bottom: .85rem; }
+    .search-wrap input {
+      width: 100%; max-width: 360px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(192,132,252,.3);
+      border-radius: .5rem;
+      color: var(--text); font-size: .85rem;
+      padding: .38rem .7rem; outline: none;
+    }
+    .search-wrap input::placeholder { color: var(--muted); }
+    .search-wrap input:focus { border-color: var(--cyan); }
+    /* ── Retention tables ── */
+    .tbl-wrap { overflow-x: auto; }
+    .ret-tbl { width: 100%; border-collapse: collapse; font-size: .855rem; min-width: 480px; }
+    .ret-tbl thead tr { border-bottom: 1px solid rgba(192,132,252,.3); }
+    .ret-tbl th {
+      padding: .45rem .45rem; text-align: left;
+      font-size: .68rem; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--muted); white-space: nowrap;
+    }
+    .ret-tbl th.r, .ret-tbl td.r { text-align: right; }
+    .ret-tbl tbody tr { border-bottom: 1px solid rgba(192,132,252,.08); transition: background .15s; }
+    .ret-tbl tbody tr:hover { background: rgba(192,132,252,.08); }
+    .ret-tbl tbody tr.hidden { display: none; }
+    .ret-tbl td { padding: .5rem .45rem; }
+    .ret-tbl td a { color: var(--cyan); text-decoration: none; font-size: .78rem; }
+    .ret-tbl td a:hover { text-decoration: underline; }
+    .ret-tbl td.amt { font-weight: 700; color: var(--muted); }
+    .ret-tbl td.hi  { color: var(--cyan); text-shadow: 0 0 8px rgba(0,229,255,.4); font-weight: 700; }
+    .ret-tbl td.empty { text-align: center; color: var(--muted); padding: 1.5rem; font-style: italic; }
+    .section-note { border-style: dashed; }
+    .chart-card-line { max-width:960px; margin:0 auto 1.5rem; }
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: .75rem;
+      color: rgba(167,139,202,.4);
+    }
+    @media (max-width: 640px) {
+      .raffle-hero { flex-direction: column; align-items: flex-start; }
+      .hero-stat { text-align: left; }
+      .goal-sub { flex-direction: column; gap: .25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <img src="https://sirporkalot.vercel.app/Photo_2.jpeg" alt="Sir Pork-a-Lot" />
+    <h1>Raffle Dashboard 2026</h1>
+    <p class="sub">Multi-raffle totals for Hogs for the Cause and APEX CRNA Essential Bundle · Last updated May 06, 2026 08:44 PM CDT</p>
+    <div class="divider"></div>
+  </div>
+
+  <div class="raffle-switcher">
+    <button class="raffle-switch active" data-raffle-btn="hogs" onclick="switchRaffle('hogs', this)">Hogs<span>Hogs for the Cause totals</span></button><button class="raffle-switch" data-raffle-btn="crna" onclick="switchRaffle('crna', this)">APEX CRNA Bundle<span>APEX CRNA Essential Bundle totals</span></button>
+  </div>
+
+  
+  <section class="raffle-page active" data-raffle-page="hogs">
+    <div class="raffle-hero">
+      <div>
+        <div class="eyebrow">Live Raffle View</div>
+        <h2>Hogs for the Cause</h2>
+        <p>2026 totals and sales details.</p>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-label">Tickets Sold</span>
+        <span class="hero-stat-value">1741</span>
+      </div>
+    </div>
+
+    <div class="tabs tabs-inner">
+      <button class="tab-btn active" onclick="switchTab('hogs', 'dashboard', this)">Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('hogs', 'retention', this)">Retention &amp; YoY</button>
+    </div>
+
+    <div id="tab-hogs-dashboard" class="tab-panel active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Total Raised</div>
+          <div class="card-value gold">$31,195</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Tickets Sold</div>
+          <div class="card-value cyan">1741</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Buyers</div>
+          <div class="card-value purp">394</div>
+        </div>
+      </div>
+
+      
+  <div class="goal-card">
+    <div class="goal-header">
+      <span class="goal-title">Goal Progress - $30,000</span>
+      <span class="goal-pct">100%</span>
+    </div>
+    <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+    <div class="goal-sub">
+      <span>$31,195 raised</span>
+      <span>$0 to go</span>
+    </div>
+  </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Daily Sales ($)</div>
+          <canvas id="hogs-barChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Ticket Tier Mix</div>
+          <canvas id="hogs-donutChart"></canvas>
+        </div>
+      </div>
+
+      <div class="leaderboard">
+        <div class="lb-title">Current-Year Supporters ($100+)</div>
+        <table>
+          <tbody><tr><td class="td-name">Robert St John</td><td class="td-amount">$400</td></tr><tr><td class="td-name">Christy Huerstel</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Barrett Littell</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Sarah Simmons</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Christopher Buchart</td><td class="td-amount">$200</td></tr><tr><td class="td-name">William Daly</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Tucker Golson</td><td class="td-amount">$200</td></tr><tr><td class="td-name">HAROLD MUSTIN</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Haleem Shehadeh</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Matt Williams</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Emily Buras</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Debbie Taullie</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Mark Johnson</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Amy Herrick</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Robert Edwards</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Hector Ferral</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Mathew Eng</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Paul Gladden</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Chandra Vemulapalli</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Sarah Glover</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Nisha Logan</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Taylor Faul</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Chase Brown</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Orlando Salinas</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Joseph Colvin</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Taylor Bensel</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Dean Freundlich</td><td class="td-amount">$200</td></tr><tr><td class="td-name">scott mccain</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Brice Power</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Jake Lipps</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Ingrid Huet</td><td class="td-amount">$200</td></tr><tr><td class="td-name">Shane Verrett</td><td class="td-amount">$160</td></tr><tr><td class="td-name">Earline Chiasson</td><td class="td-amount">$160</td></tr><tr><td class="td-name">Avery Novak</td><td class="td-amount">$160</td></tr><tr><td class="td-name">Jennifer Baker</td><td class="td-amount">$120</td></tr><tr><td class="td-name">Leighton Ventura</td><td class="td-amount">$120</td></tr><tr><td class="td-name">Stevie Sims II</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Michael Powell</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Sharon Lafrance</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Megan Bunch</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Stephanie Douglass</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jonathan Dufrene</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Caroline King</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Treavor Hartwell</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ginny Casey</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Patrick Hoppe</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Glenn St. John</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Seth Jarrell</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Andrew Larkin</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Bryan Marcell</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ashley Morgan</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Brittney Beckwith</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jarrod-Amber Ratliff</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Kim Nguyen</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Diana Ullo</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Elise Reeves</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Dasha Arnold</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Stephen Caldwell</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Michael Palm</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Sarah Izdepski</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Melissa Washington</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Laura Bonanno</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Emily Kilcrease</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jeremy Dufrene</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Janet Wilson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">elizabeth nelson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Alan Holtzman</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ashley Moran</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Timothy Breaux</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Zack Wilson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Robert Wheaton</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Samuel Skinner</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Raven Fielding</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Morgan Miller</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Caitlyn DelValle</td><td class="td-amount">$100</td></tr><tr><td class="td-name">David Gentry</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Gloria Mejia</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Kellan Martin</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Russell Golson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ana Payne</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Lisa Carey</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jennifer Dignan</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Mary Clement</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Kyra Huguet</td><td class="td-amount">$100</td></tr><tr><td class="td-name">David Kalil</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Margaret Sims</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Misty Moore</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Laura Maher</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Thomas Brandt</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ben Curry</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Mark Tufts</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Lisa Reaney</td><td class="td-amount">$100</td></tr><tr><td class="td-name">ALEXANDER WATERS</td><td class="td-amount">$100</td></tr><tr><td class="td-name">James Rogers</td><td class="td-amount">$100</td></tr><tr><td class="td-name">John Reeves</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jenny Walker</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Rhett Rogers</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Mary Lorraine Bellard</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Shari Branton</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jarrod Decoteau</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Stuart Brown</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Lisa Strimpel</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jill Morgan</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jennifer Lambert</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Michael Zemke</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Danielle Davis</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jacob Bray</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Sarah Burns</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Chris Trahan</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Bruce Torrance</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Adele Williams</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Alex Wimberley</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Kyle Chauvin</td><td class="td-amount">$100</td></tr><tr><td class="td-name">John Mallery</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ian Hodgdon</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Andrew Gabig</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Mario Rivera</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jason Every</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Luis Salcedo</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Padnos Ira</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Kevin Moran</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Marc Burmaster</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Lesley Miller</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Russell Butz</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Scott Rooney</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Shae Puglia</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Adam Weinberg</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ericha Champagne</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Brett Barrilleaux</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Trey Perrin</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jonathan Cohen</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Dominique Harmon</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Bryan Wagar</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Stephen Landreneau</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Greg Tortirich</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Juliet Falcon</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Garret Williams</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Daniel Miles</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Laura Meteye</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Dan Laney</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Erin Bujol</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Arin Jones</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Alex Fairchild</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Riley Edwards</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Cindy Nguyen</td><td class="td-amount">$100</td></tr><tr><td class="td-name">John Greer</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Frank Benfiglio</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Aimee Homra</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Elizabeth Feigley</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Brittany Dugas</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jarrett Gilliam</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Mark Sieverding</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Andrew Joyce</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Chase Chiasson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jennifer Milligan</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Holly Guidry</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Denise Redmann Hoffman</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jonathan Lorio</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Tracy LeCompte</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Stephanie Parks</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Jeff Franklin</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Kim Johnson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Clyde Thompson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Connor Morgan</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Alisha Chiasson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Krista DelBuno</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Pam Masson</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ronald Bordelon</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Ty Moreau</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Nicole Herreros</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Caroline DelBuno</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Adele Jeffreys</td><td class="td-amount">$100</td></tr><tr><td class="td-name">Alana Reichert</td><td class="td-amount">$100</td></tr></tbody>
+        </table>
+      </div>
+
+      
+    </div>
+
+    
+  <div id="tab-hogs-retention" class="tab-panel">
+    <div class="ret-grid">
+      <div class="ret-card">
+        <div class="ret-label">2026 Buyers</div>
+        <div class="ret-val cyan">394</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">2025 Buyers</div>
+        <div class="ret-val purp">294</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">Returning</div>
+        <div class="ret-val grn">125</div>
+        <div class="ret-sub">Retention: 42.5%</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">Prospects</div>
+        <div class="ret-val gold">169</div>
+        <div class="ret-sub">2025 buyers not yet in 2026</div>
+      </div>
+      <div class="ret-card">
+        <div class="ret-label">New Buyers</div>
+        <div class="ret-val pink">269</div>
+        <div class="ret-sub">First-timers in 2026</div>
+      </div>
+    </div>
+
+    <div class="yoy-card">
+      <div class="yoy-title">Year-over-Year - through May 06, 2026 vs same date in 2025</div>
+      <div class="yoy-grid">
+        <div class="yoy-col">
+          <div class="yoy-yr">2025 (through May 06)</div>
+          <div class="yoy-val purp">$24,070</div>
+          <div class="yoy-sub">1,363 tickets · 294 buyers</div>
+        </div>
+        <div class="vs-col">
+          <div class="vs-arrow up">▲</div>
+          <div class="yoy-badge badge-up">+29.6%</div>
+        </div>
+        <div class="yoy-col">
+          <div class="yoy-yr">2026 (to date)</div>
+          <div class="yoy-val cyan">$31,195</div>
+          <div class="yoy-sub">1,741 tickets · 394 buyers</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card chart-card-line">
+      <div class="chart-title">Cumulative Sales - 2025 (full year) vs 2026 (to date)</div>
+      <canvas id="hogs-lineChart" style="max-height:360px"></canvas>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">Returning Buyers</span>
+        <span class="badge-count">125</span>
+      </div>
+      <p class="sec-desc">Bought tickets in both 2025 and 2026.</p>
+      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone..." oninput="filterTable('tbl-hogs-ret', this.value)" /></div>
+      <div class="tbl-wrap">
+        <table id="tbl-hogs-ret" class="ret-tbl">
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Phone</th>
+            <th class="r">2025 Tix</th><th class="r">2025 Paid</th>
+            <th class="r">2026 Tix</th><th class="r">2026 Paid</th>
+          </tr></thead>
+          <tbody><tr data-search="Robert St John  "><td>Robert St John</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">24</td><td class="r amt hi">$400</td></tr><tr data-search="Emily Buras Hendrice10@gmail.com 504-451-2229"><td>Emily Buras</td><td><a href="mailto:Hendrice10@gmail.com">Hendrice10@gmail.com</a></td><td>504-451-2229</td><td class="r">6</td><td class="r amt">$100</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Matt Williams Mattwilliamscrna@gmail.com 225-572-5142"><td>Matt Williams</td><td><a href="mailto:Mattwilliamscrna@gmail.com">Mattwilliamscrna@gmail.com</a></td><td>225-572-5142</td><td class="r">18</td><td class="r amt">$300</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Joseph Colvin jocolv58@gmail.com 228-363-1252"><td>Joseph Colvin</td><td><a href="mailto:jocolv58@gmail.com">jocolv58@gmail.com</a></td><td>228-363-1252</td><td class="r">6</td><td class="r amt">$100</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Sarah Simmons sesimmons01@yahoo.com 601-462-6044"><td>Sarah Simmons</td><td><a href="mailto:sesimmons01@yahoo.com">sesimmons01@yahoo.com</a></td><td>601-462-6044</td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="HAROLD MUSTIN  "><td>HAROLD MUSTIN</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Barrett Littell barrettlittell@att.net 985-351-6799"><td>Barrett Littell</td><td><a href="mailto:barrettlittell@att.net">barrettlittell@att.net</a></td><td>985-351-6799</td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Amy Herrick aehcrna@gmail.com 925-997-5180"><td>Amy Herrick</td><td><a href="mailto:aehcrna@gmail.com">aehcrna@gmail.com</a></td><td>925-997-5180</td><td class="r">6</td><td class="r amt">$100</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Robert Edwards  "><td>Robert Edwards</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Chase Brown  "><td>Chase Brown</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Hector Ferral  "><td>Hector Ferral</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Mathew Eng  "><td>Mathew Eng</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Orlando Salinas  "><td>Orlando Salinas</td><td></td><td></td><td class="r">13</td><td class="r amt">$225</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Jake Lipps  "><td>Jake Lipps</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Chandra Vemulapalli  "><td>Chandra Vemulapalli</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Taylor Bensel  "><td>Taylor Bensel</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Nisha Logan  "><td>Nisha Logan</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Dean Freundlich  "><td>Dean Freundlich</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Earline Chiasson echiasson53@gmail.com 985-438-5401"><td>Earline Chiasson</td><td><a href="mailto:echiasson53@gmail.com">echiasson53@gmail.com</a></td><td>985-438-5401</td><td class="r">3</td><td class="r amt">$60</td><td class="r">9</td><td class="r amt hi">$160</td></tr><tr data-search="Jennifer Baker jenmoldthan@gmail.com 504-701-3431"><td>Jennifer Baker</td><td><a href="mailto:jenmoldthan@gmail.com">jenmoldthan@gmail.com</a></td><td>504-701-3431</td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$120</td></tr><tr data-search="Stevie Sims II  "><td>Stevie Sims II</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Mark Tufts marktufts807@gmail.com 504-390-4180"><td>Mark Tufts</td><td><a href="mailto:marktufts807@gmail.com">marktufts807@gmail.com</a></td><td>504-390-4180</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ashley Morgan  "><td>Ashley Morgan</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Seth Jarrell seth_jarrell@yahoo.com 337-692-2699"><td>Seth Jarrell</td><td><a href="mailto:seth_jarrell@yahoo.com">seth_jarrell@yahoo.com</a></td><td>337-692-2699</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jarrod Decoteau jarrod.decoteau@yahoo.com 225-241-2224"><td>Jarrod Decoteau</td><td><a href="mailto:jarrod.decoteau@yahoo.com">jarrod.decoteau@yahoo.com</a></td><td>225-241-2224</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jeremy Dufrene  "><td>Jeremy Dufrene</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ginny Casey gcaseycrna@gmail.com 504-813-4988"><td>Ginny Casey</td><td><a href="mailto:gcaseycrna@gmail.com">gcaseycrna@gmail.com</a></td><td>504-813-4988</td><td class="r">12</td><td class="r amt">$200</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Elise Reeves elisebreeves@gmail.com 601-248-0736"><td>Elise Reeves</td><td><a href="mailto:elisebreeves@gmail.com">elisebreeves@gmail.com</a></td><td>601-248-0736</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="John Reeves  "><td>John Reeves</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Diana Ullo  "><td>Diana Ullo</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Mary Lorraine Bellard  "><td>Mary Lorraine Bellard</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Marc Burmaster marcburm@gmail.com 504-258-7710"><td>Marc Burmaster</td><td><a href="mailto:marcburm@gmail.com">marcburm@gmail.com</a></td><td>504-258-7710</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Alan Holtzman  "><td>Alan Holtzman</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Robert Wheaton robwheaton@comcast.net 281-650-4562"><td>Robert Wheaton</td><td><a href="mailto:robwheaton@comcast.net">robwheaton@comcast.net</a></td><td>281-650-4562</td><td class="r">12</td><td class="r amt">$200</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Timothy Breaux tbro1949@cox.net (504)512-5070"><td>Timothy Breaux</td><td><a href="mailto:tbro1949@cox.net">tbro1949@cox.net</a></td><td>(504)512-5070</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="ALEXANDER WATERS  "><td>ALEXANDER WATERS</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Rhett Rogers  "><td>Rhett Rogers</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Juliet Falcon Jmfalcon27@gmail.com 504-982-0659"><td>Juliet Falcon</td><td><a href="mailto:Jmfalcon27@gmail.com">Jmfalcon27@gmail.com</a></td><td>504-982-0659</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Megan Bunch Meganbunch2012@yahoo.com 985-707-5018"><td>Megan Bunch</td><td><a href="mailto:Meganbunch2012@yahoo.com">Meganbunch2012@yahoo.com</a></td><td>985-707-5018</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Misty Moore txas92@gmail.com 850-832-9577"><td>Misty Moore</td><td><a href="mailto:txas92@gmail.com">txas92@gmail.com</a></td><td>850-832-9577</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Alex Wimberley  "><td>Alex Wimberley</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jenny Walker  "><td>Jenny Walker</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Michael Zemke  "><td>Michael Zemke</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ana Payne ana.payne@yahoo.com 504-289-7760"><td>Ana Payne</td><td><a href="mailto:ana.payne@yahoo.com">ana.payne@yahoo.com</a></td><td>504-289-7760</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Sarah Burns Skburns10@hotmail.com 817-980-9329"><td>Sarah Burns</td><td><a href="mailto:Skburns10@hotmail.com">Skburns10@hotmail.com</a></td><td>817-980-9329</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Morgan Miller meauxmiller@gmail.com 225-317-2256"><td>Morgan Miller</td><td><a href="mailto:meauxmiller@gmail.com">meauxmiller@gmail.com</a></td><td>225-317-2256</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Janet Wilson Jw70592@gmail.com 337-288-3722"><td>Janet Wilson</td><td><a href="mailto:Jw70592@gmail.com">Jw70592@gmail.com</a></td><td>337-288-3722</td><td class="r">12</td><td class="r amt">$200</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Aimee Homra aimeehomra@gmail.com 504-390-6272"><td>Aimee Homra</td><td><a href="mailto:aimeehomra@gmail.com">aimeehomra@gmail.com</a></td><td>504-390-6272</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Lisa Reaney lisa@ajs8.com 504-416-1172"><td>Lisa Reaney</td><td><a href="mailto:lisa@ajs8.com">lisa@ajs8.com</a></td><td>504-416-1172</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Denise Redmann Hoffman  "><td>Denise Redmann Hoffman</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kevin Moran kfmoran14@gmail.com 571-481-7390"><td>Kevin Moran</td><td><a href="mailto:kfmoran14@gmail.com">kfmoran14@gmail.com</a></td><td>571-481-7390</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Michael Palm lvunddust@aol.com 504-220-5775"><td>Michael Palm</td><td><a href="mailto:lvunddust@aol.com">lvunddust@aol.com</a></td><td>504-220-5775</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="David Kalil Davidkalil@att.net 504-975-8103"><td>David Kalil</td><td><a href="mailto:Davidkalil@att.net">Davidkalil@att.net</a></td><td>504-975-8103</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Mary Clement mary.m.clement@gmail.com 985-210-9872"><td>Mary Clement</td><td><a href="mailto:mary.m.clement@gmail.com">mary.m.clement@gmail.com</a></td><td>985-210-9872</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Stuart Brown shbrown2020@gmail.com 386-209-2020"><td>Stuart Brown</td><td><a href="mailto:shbrown2020@gmail.com">shbrown2020@gmail.com</a></td><td>386-209-2020</td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Lisa Carey Lcarey73@gmail.com 850-774-8061"><td>Lisa Carey</td><td><a href="mailto:Lcarey73@gmail.com">Lcarey73@gmail.com</a></td><td>850-774-8061</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kyra Huguet Kyrahuguet504@yahoo.com 504-450-4045"><td>Kyra Huguet</td><td><a href="mailto:Kyrahuguet504@yahoo.com">Kyrahuguet504@yahoo.com</a></td><td>504-450-4045</td><td class="r">12</td><td class="r amt">$200</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Chris Trahan Cdtrahan@gmail.com 504-975-7445"><td>Chris Trahan</td><td><a href="mailto:Cdtrahan@gmail.com">Cdtrahan@gmail.com</a></td><td>504-975-7445</td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Bryan Wagar Bryanwagar25@gmail.com 504-439-6935"><td>Bryan Wagar</td><td><a href="mailto:Bryanwagar25@gmail.com">Bryanwagar25@gmail.com</a></td><td>504-439-6935</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="James Rogers  "><td>James Rogers</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jarrod-Amber Ratliff  "><td>Jarrod-Amber Ratliff</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ben Curry benc3202@gmail.com 225-268-2755"><td>Ben Curry</td><td><a href="mailto:benc3202@gmail.com">benc3202@gmail.com</a></td><td>225-268-2755</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Holly Guidry Smiles70124@yahoo.com 504-250-3439"><td>Holly Guidry</td><td><a href="mailto:Smiles70124@yahoo.com">Smiles70124@yahoo.com</a></td><td>504-250-3439</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kellan Martin kellanmartin32@gmail.com 601-395-1711"><td>Kellan Martin</td><td><a href="mailto:kellanmartin32@gmail.com">kellanmartin32@gmail.com</a></td><td>601-395-1711</td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Dan Laney  "><td>Dan Laney</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Bruce Torrance  "><td>Bruce Torrance</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Brittany Dugas  "><td>Brittany Dugas</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Gloria Mejia  "><td>Gloria Mejia</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Alex Fairchild  "><td>Alex Fairchild</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Stephanie Parks  "><td>Stephanie Parks</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kim Nguyen  "><td>Kim Nguyen</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Chase Chiasson Chasemchiasson@gmail.com 985-438-9589"><td>Chase Chiasson</td><td><a href="mailto:Chasemchiasson@gmail.com">Chasemchiasson@gmail.com</a></td><td>985-438-9589</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Nicole Herreros nicole_reidling@yahoo.com 504-303-1061"><td>Nicole Herreros</td><td><a href="mailto:nicole_reidling@yahoo.com">nicole_reidling@yahoo.com</a></td><td>504-303-1061</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Lisa Strimpel Iscrubhearts2@yahoo.com 469-829-1567"><td>Lisa Strimpel</td><td><a href="mailto:Iscrubhearts2@yahoo.com">Iscrubhearts2@yahoo.com</a></td><td>469-829-1567</td><td class="r">6</td><td class="r amt">$100</td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Olivia Sullivan Oliviasullivan12@yahoo.com 985-778-3397"><td>Olivia Sullivan</td><td><a href="mailto:Oliviasullivan12@yahoo.com">Oliviasullivan12@yahoo.com</a></td><td>985-778-3397</td><td class="r">6</td><td class="r amt">$120</td><td class="r">4</td><td class="r amt hi">$85</td></tr><tr data-search="Victoria Taullie victoria_wagley@yahoo.com 337-351-8175"><td>Victoria Taullie</td><td><a href="mailto:victoria_wagley@yahoo.com">victoria_wagley@yahoo.com</a></td><td>337-351-8175</td><td class="r">2</td><td class="r amt">$50</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Tracey Wilson Traceywilson1820@gmail.com 504-451-0798"><td>Tracey Wilson</td><td><a href="mailto:Traceywilson1820@gmail.com">Traceywilson1820@gmail.com</a></td><td>504-451-0798</td><td class="r">1</td><td class="r amt">$25</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Lee Dicharry leedicharry@gmail.com 504-858-3881"><td>Lee Dicharry</td><td><a href="mailto:leedicharry@gmail.com">leedicharry@gmail.com</a></td><td>504-858-3881</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Denny Reichert dennyreichert@gmail.com 504-813-9100"><td>Denny Reichert</td><td><a href="mailto:dennyreichert@gmail.com">dennyreichert@gmail.com</a></td><td>504-813-9100</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Stephen Maduell Stephenmcrna@yahoo.com 504-782-2573"><td>Stephen Maduell</td><td><a href="mailto:Stephenmcrna@yahoo.com">Stephenmcrna@yahoo.com</a></td><td>504-782-2573</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Rebecca Navarro rdp217@yahoo.com 504-450-2931"><td>Rebecca Navarro</td><td><a href="mailto:rdp217@yahoo.com">rdp217@yahoo.com</a></td><td>504-450-2931</td><td class="r">1</td><td class="r amt">$25</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Greg Bordelon gregbordelon@me.com 504-812-7075"><td>Greg Bordelon</td><td><a href="mailto:gregbordelon@me.com">gregbordelon@me.com</a></td><td>504-812-7075</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jenna Kelly Jekelly84@gmail.com 985-264-0691"><td>Jenna Kelly</td><td><a href="mailto:Jekelly84@gmail.com">Jekelly84@gmail.com</a></td><td>985-264-0691</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="lee dennis  "><td>lee dennis</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Robin Zemke rczemke@gmail.com 504-343-8288"><td>Robin Zemke</td><td><a href="mailto:rczemke@gmail.com">rczemke@gmail.com</a></td><td>504-343-8288</td><td class="r">1</td><td class="r amt">$25</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="John Vincent 4johnvincent@gmail.com 225-933-4491"><td>John Vincent</td><td><a href="mailto:4johnvincent@gmail.com">4johnvincent@gmail.com</a></td><td>225-933-4491</td><td class="r">1</td><td class="r amt">$25</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Lisa Frey Lisa_keppel@yahoo.com 504-559-9599"><td>Lisa Frey</td><td><a href="mailto:Lisa_keppel@yahoo.com">Lisa_keppel@yahoo.com</a></td><td>504-559-9599</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Garrod Jackson Garrod.jackson@gmail.com 251-367-3658"><td>Garrod Jackson</td><td><a href="mailto:Garrod.jackson@gmail.com">Garrod.jackson@gmail.com</a></td><td>251-367-3658</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Julie Gayle jgayle477@cox.net 504-382-2806"><td>Julie Gayle</td><td><a href="mailto:jgayle477@cox.net">jgayle477@cox.net</a></td><td>504-382-2806</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Renee Legendre Renee.legendre86@gmail.com 225-715-4334"><td>Renee Legendre</td><td><a href="mailto:Renee.legendre86@gmail.com">Renee.legendre86@gmail.com</a></td><td>225-715-4334</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jonathan Boraski Jonathan.Boraski@lcmchealth.org 504-881-9030"><td>Jonathan Boraski</td><td><a href="mailto:Jonathan.Boraski@lcmchealth.org">Jonathan.Boraski@lcmchealth.org</a></td><td>504-881-9030</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Brian Smith 4smitty@charter.net 504-782-7648"><td>Brian Smith</td><td><a href="mailto:4smitty@charter.net">4smitty@charter.net</a></td><td>504-782-7648</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Ashley Sulzer  "><td>Ashley Sulzer</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Nicole Lombardi Nangelle1@aol.com 401-663-4549"><td>Nicole Lombardi</td><td><a href="mailto:Nangelle1@aol.com">Nangelle1@aol.com</a></td><td>401-663-4549</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Blake Gary  "><td>Blake Gary</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Farryn Wallow  "><td>Farryn Wallow</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Catherine Strada catstrada28@gmail.com 337-207-3153"><td>Catherine Strada</td><td><a href="mailto:catstrada28@gmail.com">catstrada28@gmail.com</a></td><td>337-207-3153</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="cade chandler Cchandler08@gmail.com 318-413-2268"><td>cade chandler</td><td><a href="mailto:Cchandler08@gmail.com">Cchandler08@gmail.com</a></td><td>318-413-2268</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Kris Martinez krislmartinez@gmail.com 504-606-1082"><td>Kris Martinez</td><td><a href="mailto:krislmartinez@gmail.com">krislmartinez@gmail.com</a></td><td>504-606-1082</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Kristen Boudreaux kristen.pilcher@gmail.com 225-573-5157"><td>Kristen Boudreaux</td><td><a href="mailto:kristen.pilcher@gmail.com">kristen.pilcher@gmail.com</a></td><td>225-573-5157</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Lien Tran Lbtran20@gmail.com 504-722-0230"><td>Lien Tran</td><td><a href="mailto:Lbtran20@gmail.com">Lbtran20@gmail.com</a></td><td>504-722-0230</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Christopher Aupied lsucrna667@gmail.com 504-577-0599"><td>Christopher Aupied</td><td><a href="mailto:lsucrna667@gmail.com">lsucrna667@gmail.com</a></td><td>504-577-0599</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="James-Paige Hall  "><td>James-Paige Hall</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Erin Bauer  "><td>Erin Bauer</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Erin Shea Esstahnke@cox.net 504-884-1257"><td>Erin Shea</td><td><a href="mailto:Esstahnke@cox.net">Esstahnke@cox.net</a></td><td>504-884-1257</td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Katherine Stuke  "><td>Katherine Stuke</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Peter Krause  "><td>Peter Krause</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Krista Haydel  "><td>Krista Haydel</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Sandy Walker  "><td>Sandy Walker</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Rosita Gee  "><td>Rosita Gee</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Bear Hawkins  "><td>Bear Hawkins</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Lauren Oglesby  "><td>Lauren Oglesby</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Simone Demelio  "><td>Simone Demelio</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Ashley Buchholz  "><td>Ashley Buchholz</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Brandi LeCompte  "><td>Brandi LeCompte</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Sara Morris slynmorris@gmail.com 225-330-9036"><td>Sara Morris</td><td><a href="mailto:slynmorris@gmail.com">slynmorris@gmail.com</a></td><td>225-330-9036</td><td class="r">6</td><td class="r amt">$100</td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Ryan Damico Ryandamico10@gmail.com 225-975-2050"><td>Ryan Damico</td><td><a href="mailto:Ryandamico10@gmail.com">Ryandamico10@gmail.com</a></td><td>225-975-2050</td><td class="r">1</td><td class="r amt">$25</td><td class="r">2</td><td class="r amt hi">$50</td></tr><tr data-search="Lyndi Smith  "><td>Lyndi Smith</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td><td class="r">2</td><td class="r amt hi">$50</td></tr><tr data-search="Jessica Teachworth Jessicateachworth@gmail.com 504-430-5652"><td>Jessica Teachworth</td><td><a href="mailto:Jessicateachworth@gmail.com">Jessicateachworth@gmail.com</a></td><td>504-430-5652</td><td class="r">3</td><td class="r amt">$60</td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Ashley Battaglia  "><td>Ashley Battaglia</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Abbie Tucker Abbie.tucker@apsb.org 225-772-3242"><td>Abbie Tucker</td><td><a href="mailto:Abbie.tucker@apsb.org">Abbie.tucker@apsb.org</a></td><td>225-772-3242</td><td class="r">1</td><td class="r amt">$25</td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Alexander Wong Awong4lsu@gmail.com 225-773-0235"><td>Alexander Wong</td><td><a href="mailto:Awong4lsu@gmail.com">Awong4lsu@gmail.com</a></td><td>225-773-0235</td><td class="r">3</td><td class="r amt">$60</td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Lori Guidry loriguidry2@gmail.com 504-228-0186"><td>Lori Guidry</td><td><a href="mailto:loriguidry2@gmail.com">loriguidry2@gmail.com</a></td><td>504-228-0186</td><td class="r">6</td><td class="r amt">$100</td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Keri Fischtziur keri_horton@yahoo.com 504-481-8276"><td>Keri Fischtziur</td><td><a href="mailto:keri_horton@yahoo.com">keri_horton@yahoo.com</a></td><td>504-481-8276</td><td class="r">6</td><td class="r amt">$100</td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Lauren Kloepfer  "><td>Lauren Kloepfer</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td><td class="r">1</td><td class="r amt hi">$25</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">Prospects</span>
+        <span class="badge-count">169</span>
+      </div>
+      <p class="sec-desc">Bought in 2025 but not yet seen in 2026.</p>
+      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone..." oninput="filterTable('tbl-hogs-pro', this.value)" /></div>
+      <div class="tbl-wrap">
+        <table id="tbl-hogs-pro" class="ret-tbl">
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Phone</th>
+            <th class="r">2025 Tix</th><th class="r">2025 Paid</th>
+          </tr></thead>
+          <tbody><tr data-search="Alyce Johnston Masqueanesthesia@yahoo.com 504-343-2216"><td>Alyce Johnston</td><td><a href="mailto:Masqueanesthesia@yahoo.com">Masqueanesthesia@yahoo.com</a></td><td>504-343-2216</td><td class="r">12</td><td class="r amt">$200</td></tr><tr data-search="Tyler Nelson Tyler.Nelson89@gmail.com 985-351-3712"><td>Tyler Nelson</td><td><a href="mailto:Tyler.Nelson89@gmail.com">Tyler.Nelson89@gmail.com</a></td><td>985-351-3712</td><td class="r">12</td><td class="r amt">$200</td></tr><tr data-search="Ira Padnos  "><td>Ira Padnos</td><td></td><td></td><td class="r">12</td><td class="r amt">$200</td></tr><tr data-search="Annadora Bruce-Keller  "><td>Annadora Bruce-Keller</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Wendy Sullivan  "><td>Wendy Sullivan</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Debra Taullie  "><td>Debra Taullie</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Rachel Hinton rachelelizabeth5744@gmail.com 601-955-2205"><td>Rachel Hinton</td><td><a href="mailto:rachelelizabeth5744@gmail.com">rachelelizabeth5744@gmail.com</a></td><td>601-955-2205</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="A and M Anesthesia Cdtrahan@gmail.com 504-975-7445"><td>A and M Anesthesia</td><td><a href="mailto:Cdtrahan@gmail.com">Cdtrahan@gmail.com</a></td><td>504-975-7445</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Roy Puderer roypude@yahoo.com 504-908-2488"><td>Roy Puderer</td><td><a href="mailto:roypude@yahoo.com">roypude@yahoo.com</a></td><td>504-908-2488</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Rachael Guillory rguillory1987@gmail.com 337-278-2351"><td>Rachael Guillory</td><td><a href="mailto:rguillory1987@gmail.com">rguillory1987@gmail.com</a></td><td>337-278-2351</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Brad Ryder bradmryder@yahoo.com 337-258-6856"><td>Brad Ryder</td><td><a href="mailto:bradmryder@yahoo.com">bradmryder@yahoo.com</a></td><td>337-258-6856</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Linda Roper roper_linda@yahoo.com 504-884-5506"><td>Linda Roper</td><td><a href="mailto:roper_linda@yahoo.com">roper_linda@yahoo.com</a></td><td>504-884-5506</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="David Prieur  "><td>David Prieur</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Ryan Kliebert cleebear@gmail.com 985-859-5240"><td>Ryan Kliebert</td><td><a href="mailto:cleebear@gmail.com">cleebear@gmail.com</a></td><td>985-859-5240</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Carson Mills carsonjmills@gmail.com 801-628-8368"><td>Carson Mills</td><td><a href="mailto:carsonjmills@gmail.com">carsonjmills@gmail.com</a></td><td>801-628-8368</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Don Falgout  "><td>Don Falgout</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Jennifer Rabaca Ingargiola  "><td>Jennifer Rabaca Ingargiola</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Tara Wimberley  "><td>Tara Wimberley</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Michael Zemke Sr.  "><td>Michael Zemke Sr.</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Benjamin Usey  "><td>Benjamin Usey</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Bradley Boudreaux  "><td>Bradley Boudreaux</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="David Sanchez  "><td>David Sanchez</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Peggy Buras pegburas@yahoo.com 504-481-0277"><td>Peggy Buras</td><td><a href="mailto:pegburas@yahoo.com">pegburas@yahoo.com</a></td><td>504-481-0277</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Robin Lee robinatpeace@yahoo.com 512-944-5779"><td>Robin Lee</td><td><a href="mailto:robinatpeace@yahoo.com">robinatpeace@yahoo.com</a></td><td>512-944-5779</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Hannah Neal  "><td>Hannah Neal</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Seth LaFleur lafleur.seth@yahoo.com 337-858-7776"><td>Seth LaFleur</td><td><a href="mailto:lafleur.seth@yahoo.com">lafleur.seth@yahoo.com</a></td><td>337-858-7776</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Matthew Strain mstrain1027@gmail.com 985-630-2211"><td>Matthew Strain</td><td><a href="mailto:mstrain1027@gmail.com">mstrain1027@gmail.com</a></td><td>985-630-2211</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Brett Mutter Mutman02@aol.com 504-415-4877"><td>Brett Mutter</td><td><a href="mailto:Mutman02@aol.com">Mutman02@aol.com</a></td><td>504-415-4877</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Leo Webb lwebb@tulane.edu 504-239-1300"><td>Leo Webb</td><td><a href="mailto:lwebb@tulane.edu">lwebb@tulane.edu</a></td><td>504-239-1300</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Alex Kilcrease Kilcrear@yahoo.com 318-381-0182"><td>Alex Kilcrease</td><td><a href="mailto:Kilcrear@yahoo.com">Kilcrear@yahoo.com</a></td><td>318-381-0182</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Patrick Ryan sryanjr7@gmail.com 504-452-7337"><td>Patrick Ryan</td><td><a href="mailto:sryanjr7@gmail.com">sryanjr7@gmail.com</a></td><td>504-452-7337</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Brett Guidry  "><td>Brett Guidry</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Betsy Usey  "><td>Betsy Usey</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Stephanie Guzman Sguzma3@gmail.com (504)-220-4547"><td>Stephanie Guzman</td><td><a href="mailto:Sguzma3@gmail.com">Sguzma3@gmail.com</a></td><td>(504)-220-4547</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Chris Sugalski Csugals@hotmail.com 504-292-6554"><td>Chris Sugalski</td><td><a href="mailto:Csugals@hotmail.com">Csugals@hotmail.com</a></td><td>504-292-6554</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Katherine Labonte katherinej.labonte@gmail.com 601-896-7313"><td>Katherine Labonte</td><td><a href="mailto:katherinej.labonte@gmail.com">katherinej.labonte@gmail.com</a></td><td>601-896-7313</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Brandon Brown Brown.brandon5@gmail.com 337-781-9696"><td>Brandon Brown</td><td><a href="mailto:Brown.brandon5@gmail.com">Brown.brandon5@gmail.com</a></td><td>337-781-9696</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Ross Castille Reelaidbac@gmail.com 225-270-4811"><td>Ross Castille</td><td><a href="mailto:Reelaidbac@gmail.com">Reelaidbac@gmail.com</a></td><td>225-270-4811</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Jason Guidry  "><td>Jason Guidry</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Patsy and Justin Hendricks Jusdoc@bellsouth.net 504-495-9722"><td>Patsy and Justin Hendricks</td><td><a href="mailto:Jusdoc@bellsouth.net">Jusdoc@bellsouth.net</a></td><td>504-495-9722</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Sean Benoit sbenoi6@gmail.com 504-444-1963"><td>Sean Benoit</td><td><a href="mailto:sbenoi6@gmail.com">sbenoi6@gmail.com</a></td><td>504-444-1963</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Collin Decker Collindecker213@yahoo.com 318-751-0946"><td>Collin Decker</td><td><a href="mailto:Collindecker213@yahoo.com">Collindecker213@yahoo.com</a></td><td>318-751-0946</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Kyle Knauth Knauthkyle@yahoo.com 985-807-4533"><td>Kyle Knauth</td><td><a href="mailto:Knauthkyle@yahoo.com">Knauthkyle@yahoo.com</a></td><td>985-807-4533</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Adam Tarver Adamajt08@gmail.com 225-439-3302"><td>Adam Tarver</td><td><a href="mailto:Adamajt08@gmail.com">Adamajt08@gmail.com</a></td><td>225-439-3302</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Bud Angelette Budman1005@yahoo.com 985-226-9792"><td>Bud Angelette</td><td><a href="mailto:Budman1005@yahoo.com">Budman1005@yahoo.com</a></td><td>985-226-9792</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Ducky Recovery LLC Danny@duckyjohnson.com 908-783-4854"><td>Ducky Recovery LLC</td><td><a href="mailto:Danny@duckyjohnson.com">Danny@duckyjohnson.com</a></td><td>908-783-4854</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Scott Fowler ttocsfowler@yahoo.com 225-571-0890"><td>Scott Fowler</td><td><a href="mailto:ttocsfowler@yahoo.com">ttocsfowler@yahoo.com</a></td><td>225-571-0890</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Andrew Bourgeois abour29@gmail.com 225-281-0746"><td>Andrew Bourgeois</td><td><a href="mailto:abour29@gmail.com">abour29@gmail.com</a></td><td>225-281-0746</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Nick Diasselliss ndiass30@gmail.com 504-442-2123"><td>Nick Diasselliss</td><td><a href="mailto:ndiass30@gmail.com">ndiass30@gmail.com</a></td><td>504-442-2123</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Lindsey Walker  "><td>Lindsey Walker</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Renee Zeringue  "><td>Renee Zeringue</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Moonlight Anesthesia loriplewis14@gmail.com 901-270-3031"><td>Moonlight Anesthesia</td><td><a href="mailto:loriplewis14@gmail.com">loriplewis14@gmail.com</a></td><td>901-270-3031</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Kevin Lundeen klundeen1@gmail.com 985-707-8066"><td>Kevin Lundeen</td><td><a href="mailto:klundeen1@gmail.com">klundeen1@gmail.com</a></td><td>985-707-8066</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Sandra Wiemann  "><td>Sandra Wiemann</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Kim Servey  "><td>Kim Servey</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Heather le jeune bar Rocco  "><td>Heather le jeune bar Rocco</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Alison Smith  "><td>Alison Smith</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Roger Rivet  "><td>Roger Rivet</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Courtney Himel  "><td>Courtney Himel</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Stephan Landreneau  "><td>Stephan Landreneau</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Vilija Vaitaitis  "><td>Vilija Vaitaitis</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="David Raymond Jr  "><td>David Raymond Jr</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Nancy Barber Nancybarber10@gmail.com 504-432-4827"><td>Nancy Barber</td><td><a href="mailto:Nancybarber10@gmail.com">Nancybarber10@gmail.com</a></td><td>504-432-4827</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Debbie Henton dsshenton@yahoo.com 985-778-7103"><td>Debbie Henton</td><td><a href="mailto:dsshenton@yahoo.com">dsshenton@yahoo.com</a></td><td>985-778-7103</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Linda Moreau  "><td>Linda Moreau</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Darlene Ricks darlene.ricks1@gmail.com 504-259-1994"><td>Darlene Ricks</td><td><a href="mailto:darlene.ricks1@gmail.com">darlene.ricks1@gmail.com</a></td><td>504-259-1994</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Angela Blanchard Augulano@gmail.com 504-931-8329"><td>Angela Blanchard</td><td><a href="mailto:Augulano@gmail.com">Augulano@gmail.com</a></td><td>504-931-8329</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Bridget McSpadden bridget.mcspadden1@gmail.com 504-909-7832"><td>Bridget McSpadden</td><td><a href="mailto:bridget.mcspadden1@gmail.com">bridget.mcspadden1@gmail.com</a></td><td>504-909-7832</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Cane River Pools and Spas, LLC  "><td>Cane River Pools and Spas, LLC</td><td></td><td></td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Patrick Mladenka mladenka_9@yahoo.com 318-517-4783"><td>Patrick Mladenka</td><td><a href="mailto:mladenka_9@yahoo.com">mladenka_9@yahoo.com</a></td><td>318-517-4783</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Keith Jarrett phi_921@yahoo.com 504-616-4162"><td>Keith Jarrett</td><td><a href="mailto:phi_921@yahoo.com">phi_921@yahoo.com</a></td><td>504-616-4162</td><td class="r">6</td><td class="r amt">$100</td></tr><tr data-search="Whitney Hankins  "><td>Whitney Hankins</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Nicholas Cobar ncobar1@gmail.com 504-237-0310"><td>Nicholas Cobar</td><td><a href="mailto:ncobar1@gmail.com">ncobar1@gmail.com</a></td><td>504-237-0310</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Chip Brandt geauxgators88@gmail.com 504-914-0673"><td>Chip Brandt</td><td><a href="mailto:geauxgators88@gmail.com">geauxgators88@gmail.com</a></td><td>504-914-0673</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Eric Wimberley ewimb11@gmail.com 337-945-8915"><td>Eric Wimberley</td><td><a href="mailto:ewimb11@gmail.com">ewimb11@gmail.com</a></td><td>337-945-8915</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Sarah Branton swbranton3@yahoo.com 337-945-2362"><td>Sarah Branton</td><td><a href="mailto:swbranton3@yahoo.com">swbranton3@yahoo.com</a></td><td>337-945-2362</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Randy Wagley randywagley@gmail.com 337-351-1630"><td>Randy Wagley</td><td><a href="mailto:randywagley@gmail.com">randywagley@gmail.com</a></td><td>337-351-1630</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Cheri Landry Gabes91@yahoo.com +1 (504) 430-1963"><td>Cheri Landry</td><td><a href="mailto:Gabes91@yahoo.com">Gabes91@yahoo.com</a></td><td>+1 (504) 430-1963</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Vicki Moore  "><td>Vicki Moore</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Holly Braselman  "><td>Holly Braselman</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Gina Recile  "><td>Gina Recile</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Brittani Sanchez  "><td>Brittani Sanchez</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Patrick Bryde patrickB1194@gmail.com 678-761-1101"><td>Patrick Bryde</td><td><a href="mailto:patrickB1194@gmail.com">patrickB1194@gmail.com</a></td><td>678-761-1101</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Cori Schuler cori.schuler@gmail.com 504-957-2280"><td>Cori Schuler</td><td><a href="mailto:cori.schuler@gmail.com">cori.schuler@gmail.com</a></td><td>504-957-2280</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Christina Ontiveros cmontiveros75@gmail.com 830-377-2400"><td>Christina Ontiveros</td><td><a href="mailto:cmontiveros75@gmail.com">cmontiveros75@gmail.com</a></td><td>830-377-2400</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Kellin Reynolds kkreynolds7@gmail.com 504-975-8105"><td>Kellin Reynolds</td><td><a href="mailto:kkreynolds7@gmail.com">kkreynolds7@gmail.com</a></td><td>504-975-8105</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Corey Clavier clavier21@gmail.com 504-554-1546"><td>Corey Clavier</td><td><a href="mailto:clavier21@gmail.com">clavier21@gmail.com</a></td><td>504-554-1546</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Marc Badon Mcbadon@gmail.com 337-274-2634"><td>Marc Badon</td><td><a href="mailto:Mcbadon@gmail.com">Mcbadon@gmail.com</a></td><td>337-274-2634</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Therese Stentz Cdtrahan@gmail.com 504-259-6331"><td>Therese Stentz</td><td><a href="mailto:Cdtrahan@gmail.com">Cdtrahan@gmail.com</a></td><td>504-259-6331</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Keenan Holmes  "><td>Keenan Holmes</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Meredith Meliet Meredithmeliet@gmail.com 225-933-0311"><td>Meredith Meliet</td><td><a href="mailto:Meredithmeliet@gmail.com">Meredithmeliet@gmail.com</a></td><td>225-933-0311</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Taylor LeBlanc  "><td>Taylor LeBlanc</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Austin Lapeyrouse lapeyrouseaustin@gmail.com 985-991-8404"><td>Austin Lapeyrouse</td><td><a href="mailto:lapeyrouseaustin@gmail.com">lapeyrouseaustin@gmail.com</a></td><td>985-991-8404</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Rachel Cuccia  "><td>Rachel Cuccia</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Dr. Ustansa  "><td>Dr. Ustansa</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Joe  "><td>Joe</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Kelly stewart  "><td>Kelly stewart</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Ian Hodgon  "><td>Ian Hodgon</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Kristi Simon  "><td>Kristi Simon</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Julia Robbins  "><td>Julia Robbins</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Jonathan Schoen  "><td>Jonathan Schoen</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Sydney Tsen  "><td>Sydney Tsen</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Troy Turner  "><td>Troy Turner</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Caroline Rickert  "><td>Caroline Rickert</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Shauna Leger  "><td>Shauna Leger</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Marcy Ruello  "><td>Marcy Ruello</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Nichole Price  "><td>Nichole Price</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Megan Gibson  "><td>Megan Gibson</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Colleen Varela  "><td>Colleen Varela</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Dana Glascon  "><td>Dana Glascon</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Casey Groesch  "><td>Casey Groesch</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Janelle st Germain  "><td>Janelle st Germain</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Victoria Miles  "><td>Victoria Miles</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="DJ Gsell  "><td>DJ Gsell</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Trevor Thompson twtnola504@gmail.com 504-715-8070"><td>Trevor Thompson</td><td><a href="mailto:twtnola504@gmail.com">twtnola504@gmail.com</a></td><td>504-715-8070</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Ben Hamawy Benhamawy@hotmail.com 504-432-2705"><td>Ben Hamawy</td><td><a href="mailto:Benhamawy@hotmail.com">Benhamawy@hotmail.com</a></td><td>504-432-2705</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Brigette Pennington Brigetteh.1010@gmail.com 985-373-5818"><td>Brigette Pennington</td><td><a href="mailto:Brigetteh.1010@gmail.com">Brigetteh.1010@gmail.com</a></td><td>985-373-5818</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Ashley Gisclair ashleygis1983@gmail.com 985-258-3694"><td>Ashley Gisclair</td><td><a href="mailto:ashleygis1983@gmail.com">ashleygis1983@gmail.com</a></td><td>985-258-3694</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Meagan Luce meaganeluce@gmail.com 225-287-5175"><td>Meagan Luce</td><td><a href="mailto:meaganeluce@gmail.com">meaganeluce@gmail.com</a></td><td>225-287-5175</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Sarah Gisclair sarahrstpierre@yahoo.com 985-637-4294"><td>Sarah Gisclair</td><td><a href="mailto:sarahrstpierre@yahoo.com">sarahrstpierre@yahoo.com</a></td><td>985-637-4294</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Dillon Smith Dillonsmith504@live.com 504-621-0658"><td>Dillon Smith</td><td><a href="mailto:Dillonsmith504@live.com">Dillonsmith504@live.com</a></td><td>504-621-0658</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Jennifer Burdette Jlburdette@icloud.com 832- 640-2069"><td>Jennifer Burdette</td><td><a href="mailto:Jlburdette@icloud.com">Jlburdette@icloud.com</a></td><td>832- 640-2069</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Paul Klein  "><td>Paul Klein</td><td></td><td></td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Sharon Tanory Sjd8522@hotmail.com 318-491-0330"><td>Sharon Tanory</td><td><a href="mailto:Sjd8522@hotmail.com">Sjd8522@hotmail.com</a></td><td>318-491-0330</td><td class="r">3</td><td class="r amt">$60</td></tr><tr data-search="Jesse Jarrett jjarr17@gmail.com 504-237-4627"><td>Jesse Jarrett</td><td><a href="mailto:jjarr17@gmail.com">jjarr17@gmail.com</a></td><td>504-237-4627</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Tesla Medina Berrios  "><td>Tesla Medina Berrios</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Albert Martinez lilbert84van@yahoo.com 504-258-8684"><td>Albert Martinez</td><td><a href="mailto:lilbert84van@yahoo.com">lilbert84van@yahoo.com</a></td><td>504-258-8684</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Leland McCluskey lelandmccluskey@gmail.com 706-580-0037"><td>Leland McCluskey</td><td><a href="mailto:lelandmccluskey@gmail.com">lelandmccluskey@gmail.com</a></td><td>706-580-0037</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="William Conwell Williamconwell90@yahoo.com 504-487-2112"><td>William Conwell</td><td><a href="mailto:Williamconwell90@yahoo.com">Williamconwell90@yahoo.com</a></td><td>504-487-2112</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Joshua Vicknair vicknair.joshua@gmail.com 504-296-6367"><td>Joshua Vicknair</td><td><a href="mailto:vicknair.joshua@gmail.com">vicknair.joshua@gmail.com</a></td><td>504-296-6367</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Lisa Sanchez Supernana504@gmail.com 1-504-338-2270"><td>Lisa Sanchez</td><td><a href="mailto:Supernana504@gmail.com">Supernana504@gmail.com</a></td><td>1-504-338-2270</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Cynthia Thomas  "><td>Cynthia Thomas</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Monique Barry  "><td>Monique Barry</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Colin Trahan colindtrahan@gmail.com 212-203-2223"><td>Colin Trahan</td><td><a href="mailto:colindtrahan@gmail.com">colindtrahan@gmail.com</a></td><td>212-203-2223</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Becky Trosclair  "><td>Becky Trosclair</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Estelle Wimberley ebw4us@yahoo.com 337-945-6210"><td>Estelle Wimberley</td><td><a href="mailto:ebw4us@yahoo.com">ebw4us@yahoo.com</a></td><td>337-945-6210</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Dana Lavergne Dlavergne83@yahoo.com 337-692-2564"><td>Dana Lavergne</td><td><a href="mailto:Dlavergne83@yahoo.com">Dlavergne83@yahoo.com</a></td><td>337-692-2564</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Reed Duncan radunc22@yahoo.ca 985-789-4184"><td>Reed Duncan</td><td><a href="mailto:radunc22@yahoo.ca">radunc22@yahoo.ca</a></td><td>985-789-4184</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Patrick Sullivan  "><td>Patrick Sullivan</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Drew Landry dlandry14@cox.net 225-278-2717"><td>Drew Landry</td><td><a href="mailto:dlandry14@cox.net">dlandry14@cox.net</a></td><td>225-278-2717</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Morgan Wisenbaker morganwisenbaker@yahoo.com 318-737-0472"><td>Morgan Wisenbaker</td><td><a href="mailto:morganwisenbaker@yahoo.com">morganwisenbaker@yahoo.com</a></td><td>318-737-0472</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Carol Meche cmf70554@yahoo.com 337-915-9022"><td>Carol Meche</td><td><a href="mailto:cmf70554@yahoo.com">cmf70554@yahoo.com</a></td><td>337-915-9022</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="DLane Wimberley Thomas  "><td>DLane Wimberley Thomas</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Heather Hoda  "><td>Heather Hoda</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Jerry Muller jerrymuller@ymail.com 504-909-2292"><td>Jerry Muller</td><td><a href="mailto:jerrymuller@ymail.com">jerrymuller@ymail.com</a></td><td>504-909-2292</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Danyele Gomez dkg159722@gmail.com 504-810-9429"><td>Danyele Gomez</td><td><a href="mailto:dkg159722@gmail.com">dkg159722@gmail.com</a></td><td>504-810-9429</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Parker Dunaway dunawayparker@yahoo.com 225-773-3143"><td>Parker Dunaway</td><td><a href="mailto:dunawayparker@yahoo.com">dunawayparker@yahoo.com</a></td><td>225-773-3143</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Jason Williamson jawillia@southernco.com 601-310-6713"><td>Jason Williamson</td><td><a href="mailto:jawillia@southernco.com">jawillia@southernco.com</a></td><td>601-310-6713</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Torra Maney  "><td>Torra Maney</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Jacob Schroeder  "><td>Jacob Schroeder</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Christina Junior  "><td>Christina Junior</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Barry Garner  "><td>Barry Garner</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Shiva Chokshi  "><td>Shiva Chokshi</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Keenan Upton  "><td>Keenan Upton</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Angie Addison  "><td>Angie Addison</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Ashley DeCastro  "><td>Ashley DeCastro</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Stacy Goldthorpe  "><td>Stacy Goldthorpe</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Alan Mar  "><td>Alan Mar</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Louise Jumel  "><td>Louise Jumel</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Rebecca Mccloskey  "><td>Rebecca Mccloskey</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Becca Cochran  "><td>Becca Cochran</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Dr Phelan  "><td>Dr Phelan</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Lacy Virgadamo  "><td>Lacy Virgadamo</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Chris Pettus  "><td>Chris Pettus</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Georgette Lamprecht Gfendlason@gmail.com 985-981-6612"><td>Georgette Lamprecht</td><td><a href="mailto:Gfendlason@gmail.com">Gfendlason@gmail.com</a></td><td>985-981-6612</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Caroline Robichaux carolinerobichaux@gmail.com 850-572-5776"><td>Caroline Robichaux</td><td><a href="mailto:carolinerobichaux@gmail.com">carolinerobichaux@gmail.com</a></td><td>850-572-5776</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="David Daly ddaly@frilot.com 504-599-8329"><td>David Daly</td><td><a href="mailto:ddaly@frilot.com">ddaly@frilot.com</a></td><td>504-599-8329</td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Evie Evie  "><td>Evie Evie</td><td></td><td></td><td class="r">1</td><td class="r amt">$25</td></tr><tr data-search="Michael Schafer schafer.purdue@gmail.com 504-578-7877"><td>Michael Schafer</td><td><a href="mailto:schafer.purdue@gmail.com">schafer.purdue@gmail.com</a></td><td>504-578-7877</td><td class="r">1</td><td class="r amt">$25</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-hdr">
+        <span class="sec-title">New 2026 Buyers</span>
+        <span class="badge-count">269</span>
+      </div>
+      <p class="sec-desc">Purchased in 2026 with no record found in 2025.</p>
+      <div class="search-wrap"><input type="text" placeholder="Search name, email, phone..." oninput="filterTable('tbl-hogs-new', this.value)" /></div>
+      <div class="tbl-wrap">
+        <table id="tbl-hogs-new" class="ret-tbl">
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Phone</th>
+            <th class="r">2026 Tix</th><th class="r">2026 Paid</th>
+          </tr></thead>
+          <tbody><tr data-search="Christy Huerstel  "><td>Christy Huerstel</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Christopher Buchart  "><td>Christopher Buchart</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="William Daly  "><td>William Daly</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Tucker Golson  "><td>Tucker Golson</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Haleem Shehadeh  "><td>Haleem Shehadeh</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Debbie Taullie  "><td>Debbie Taullie</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Mark Johnson  "><td>Mark Johnson</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Paul Gladden  "><td>Paul Gladden</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Sarah Glover  "><td>Sarah Glover</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Taylor Faul  "><td>Taylor Faul</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="scott mccain  "><td>scott mccain</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Brice Power  "><td>Brice Power</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Ingrid Huet  "><td>Ingrid Huet</td><td></td><td></td><td class="r">12</td><td class="r amt hi">$200</td></tr><tr data-search="Shane Verrett  "><td>Shane Verrett</td><td></td><td></td><td class="r">9</td><td class="r amt hi">$160</td></tr><tr data-search="Avery Novak  "><td>Avery Novak</td><td></td><td></td><td class="r">9</td><td class="r amt hi">$160</td></tr><tr data-search="Leighton Ventura  "><td>Leighton Ventura</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$120</td></tr><tr data-search="Michael Powell  "><td>Michael Powell</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Sharon Lafrance  "><td>Sharon Lafrance</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Stephanie Douglass  "><td>Stephanie Douglass</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jonathan Dufrene  "><td>Jonathan Dufrene</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Caroline King  "><td>Caroline King</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Treavor Hartwell  "><td>Treavor Hartwell</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Patrick Hoppe  "><td>Patrick Hoppe</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Glenn St. John  "><td>Glenn St. John</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Andrew Larkin  "><td>Andrew Larkin</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Bryan Marcell  "><td>Bryan Marcell</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Brittney Beckwith  "><td>Brittney Beckwith</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Dasha Arnold  "><td>Dasha Arnold</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Stephen Caldwell  "><td>Stephen Caldwell</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Sarah Izdepski  "><td>Sarah Izdepski</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Melissa Washington  "><td>Melissa Washington</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Laura Bonanno  "><td>Laura Bonanno</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Emily Kilcrease  "><td>Emily Kilcrease</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="elizabeth nelson  "><td>elizabeth nelson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ashley Moran  "><td>Ashley Moran</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Zack Wilson  "><td>Zack Wilson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Samuel Skinner  "><td>Samuel Skinner</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Raven Fielding  "><td>Raven Fielding</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Caitlyn DelValle  "><td>Caitlyn DelValle</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="David Gentry  "><td>David Gentry</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Russell Golson  "><td>Russell Golson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jennifer Dignan  "><td>Jennifer Dignan</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Margaret Sims  "><td>Margaret Sims</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Laura Maher  "><td>Laura Maher</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Thomas Brandt  "><td>Thomas Brandt</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Shari Branton  "><td>Shari Branton</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jill Morgan  "><td>Jill Morgan</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jennifer Lambert  "><td>Jennifer Lambert</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Danielle Davis  "><td>Danielle Davis</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jacob Bray  "><td>Jacob Bray</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Adele Williams  "><td>Adele Williams</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kyle Chauvin  "><td>Kyle Chauvin</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="John Mallery  "><td>John Mallery</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ian Hodgdon  "><td>Ian Hodgdon</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Andrew Gabig  "><td>Andrew Gabig</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Mario Rivera  "><td>Mario Rivera</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jason Every  "><td>Jason Every</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Luis Salcedo  "><td>Luis Salcedo</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Padnos Ira  "><td>Padnos Ira</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Lesley Miller  "><td>Lesley Miller</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Russell Butz  "><td>Russell Butz</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Scott Rooney  "><td>Scott Rooney</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Shae Puglia  "><td>Shae Puglia</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Adam Weinberg  "><td>Adam Weinberg</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ericha Champagne  "><td>Ericha Champagne</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Brett Barrilleaux  "><td>Brett Barrilleaux</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Trey Perrin  "><td>Trey Perrin</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jonathan Cohen  "><td>Jonathan Cohen</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Dominique Harmon  "><td>Dominique Harmon</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Stephen Landreneau  "><td>Stephen Landreneau</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Greg Tortirich  "><td>Greg Tortirich</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Garret Williams  "><td>Garret Williams</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Daniel Miles  "><td>Daniel Miles</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Laura Meteye  "><td>Laura Meteye</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Erin Bujol  "><td>Erin Bujol</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Arin Jones  "><td>Arin Jones</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Riley Edwards  "><td>Riley Edwards</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Cindy Nguyen  "><td>Cindy Nguyen</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="John Greer  "><td>John Greer</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Frank Benfiglio  "><td>Frank Benfiglio</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Elizabeth Feigley  "><td>Elizabeth Feigley</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jarrett Gilliam  "><td>Jarrett Gilliam</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Mark Sieverding  "><td>Mark Sieverding</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Andrew Joyce  "><td>Andrew Joyce</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jennifer Milligan  "><td>Jennifer Milligan</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jonathan Lorio  "><td>Jonathan Lorio</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Tracy LeCompte  "><td>Tracy LeCompte</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Jeff Franklin  "><td>Jeff Franklin</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kim Johnson  "><td>Kim Johnson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Clyde Thompson  "><td>Clyde Thompson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Connor Morgan  "><td>Connor Morgan</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Alisha Chiasson  "><td>Alisha Chiasson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Krista DelBuno  "><td>Krista DelBuno</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Pam Masson  "><td>Pam Masson</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ronald Bordelon  "><td>Ronald Bordelon</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Ty Moreau  "><td>Ty Moreau</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Caroline DelBuno  "><td>Caroline DelBuno</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Adele Jeffreys  "><td>Adele Jeffreys</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Alana Reichert  "><td>Alana Reichert</td><td></td><td></td><td class="r">6</td><td class="r amt hi">$100</td></tr><tr data-search="Kaitlyn Tufts  "><td>Kaitlyn Tufts</td><td></td><td></td><td class="r">4</td><td class="r amt hi">$85</td></tr><tr data-search="Abby Donnelly  "><td>Abby Donnelly</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Anita Ainsworth  "><td>Anita Ainsworth</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Brittney Curlin  "><td>Brittney Curlin</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Ashley Adams  "><td>Ashley Adams</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Michael Smith  "><td>Michael Smith</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Nick Cormier  "><td>Nick Cormier</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Caitlin Burmaster  "><td>Caitlin Burmaster</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Kelly Broussard Johnson  "><td>Kelly Broussard Johnson</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Katie Blouin  "><td>Katie Blouin</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Ray Devlin  "><td>Ray Devlin</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jason Garis  "><td>Jason Garis</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="James Brown  "><td>James Brown</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Tressy Lauga  "><td>Tressy Lauga</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Mark St Germain  "><td>Mark St Germain</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Michelle Mata  "><td>Michelle Mata</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Michael Damare&#x27;  "><td>Michael Damare&#x27;</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Charlene Loo-Whatley  "><td>Charlene Loo-Whatley</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jennifer Ingargiola  "><td>Jennifer Ingargiola</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Karly Baker  "><td>Karly Baker</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Phillip Jordan  "><td>Phillip Jordan</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Melissa Zemke  "><td>Melissa Zemke</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Lauren Bridevaux  "><td>Lauren Bridevaux</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Dr. Charles Billings  "><td>Dr. Charles Billings</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Joe Cleary  "><td>Joe Cleary</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Anastasia Camp  "><td>Anastasia Camp</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Sheri Sirois  "><td>Sheri Sirois</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Blake Battaglia  "><td>Blake Battaglia</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Elizabeth Aucoin  "><td>Elizabeth Aucoin</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Chris P  "><td>Chris P</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Angele Hoppe  "><td>Angele Hoppe</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Christin Gethers  "><td>Christin Gethers</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Francis Lewis  "><td>Francis Lewis</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Bath Ustansa  "><td>Bath Ustansa</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Heather Barocc  "><td>Heather Barocc</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Stephen Hymel  "><td>Stephen Hymel</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Nicole Price  "><td>Nicole Price</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Selina Garcia  "><td>Selina Garcia</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jenna Martin  "><td>Jenna Martin</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Nicole Rodriguez Bishop  "><td>Nicole Rodriguez Bishop</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Liz Dao  "><td>Liz Dao</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Hunter Hall  "><td>Hunter Hall</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Dana Gaston  "><td>Dana Gaston</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Paul Delahoussaye  "><td>Paul Delahoussaye</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Katelyn Johnson  "><td>Katelyn Johnson</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Anadora Bruce Keller  "><td>Anadora Bruce Keller</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Richard Pino  "><td>Richard Pino</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Carlos Galvani  "><td>Carlos Galvani</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Lindsey Gade  "><td>Lindsey Gade</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Paula Davis  "><td>Paula Davis</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Rachel Webb  "><td>Rachel Webb</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jade Norton  "><td>Jade Norton</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Morgan Hall  "><td>Morgan Hall</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Ally Dantin  "><td>Ally Dantin</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Keione Green  "><td>Keione Green</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jenna Bowman  "><td>Jenna Bowman</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Elizabeth Upp  "><td>Elizabeth Upp</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Tracy Sand  "><td>Tracy Sand</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Taylor Guillen  "><td>Taylor Guillen</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Leslie Davis  "><td>Leslie Davis</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jonathan Nguyen  "><td>Jonathan Nguyen</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Laine Lyles  "><td>Laine Lyles</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="John Helmsteter  "><td>John Helmsteter</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jack McDermott  "><td>Jack McDermott</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Haley Dupre  "><td>Haley Dupre</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Christine Bialas  "><td>Christine Bialas</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Heather Palmisano  "><td>Heather Palmisano</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Michele Scholtens  "><td>Michele Scholtens</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Jeffrey Young  "><td>Jeffrey Young</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Douglas Gillio  "><td>Douglas Gillio</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Barbara Miramon  "><td>Barbara Miramon</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Valerie Lascelles  "><td>Valerie Lascelles</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Shawn Shank  "><td>Shawn Shank</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Dennis Deboisblanc  "><td>Dennis Deboisblanc</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Dorothea Roy  "><td>Dorothea Roy</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Akira Takada  "><td>Akira Takada</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Emily Elder  "><td>Emily Elder</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="John Trainor  "><td>John Trainor</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Meredith McCaffery  "><td>Meredith McCaffery</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Kala Gaudet  "><td>Kala Gaudet</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Laura Kersten  "><td>Laura Kersten</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Kayley Bodine  "><td>Kayley Bodine</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Marylyn Andree  "><td>Marylyn Andree</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Nick Cascio  "><td>Nick Cascio</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="David Weiland  "><td>David Weiland</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Eddie LeBoeuf III  "><td>Eddie LeBoeuf III</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Allie Bundy  "><td>Allie Bundy</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Brandon Millet  "><td>Brandon Millet</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Dakota Chenevert  "><td>Dakota Chenevert</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Sarah Wronkoski  "><td>Sarah Wronkoski</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Brennan Nugent  "><td>Brennan Nugent</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Corey Crowsen  "><td>Corey Crowsen</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Hanna Wildbur  "><td>Hanna Wildbur</td><td></td><td></td><td class="r">3</td><td class="r amt hi">$60</td></tr><tr data-search="Alaina Joseph  "><td>Alaina Joseph</td><td></td><td></td><td class="r">2</td><td class="r amt hi">$50</td></tr><tr data-search="Paige Deichmann  "><td>Paige Deichmann</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Meghan McMullin  "><td>Meghan McMullin</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Robert Gurevich  "><td>Robert Gurevich</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Patrice Kersten  "><td>Patrice Kersten</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Glenn Penton  "><td>Glenn Penton</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kristin Mills  "><td>Kristin Mills</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Joan Kersten  "><td>Joan Kersten</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Elizabeth Dowden  "><td>Elizabeth Dowden</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Mike Miller  "><td>Mike Miller</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Anne Constant  "><td>Anne Constant</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Meredith Shaw  "><td>Meredith Shaw</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Christine Jackson  "><td>Christine Jackson</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Pam Gordon  "><td>Pam Gordon</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Rod Lopez  "><td>Rod Lopez</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Parker Ellis  "><td>Parker Ellis</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Lakenye Salvage  "><td>Lakenye Salvage</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kendric Jones  "><td>Kendric Jones</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kenny custard  "><td>Kenny custard</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kara Keys  "><td>Kara Keys</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Ed Pujol  "><td>Ed Pujol</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Alexis Variste  "><td>Alexis Variste</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Andres Rosado  "><td>Andres Rosado</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Victoria Dauphin  "><td>Victoria Dauphin</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Amanda Henry  "><td>Amanda Henry</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Nancy Murphy  "><td>Nancy Murphy</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Marci Millet  "><td>Marci Millet</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="shari fourcade  "><td>shari fourcade</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Frankie Lormeus  "><td>Frankie Lormeus</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Brandon Martin  "><td>Brandon Martin</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Murira Khalid  "><td>Murira Khalid</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Sandra wieman  "><td>Sandra wieman</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Elizabeth Williams  "><td>Elizabeth Williams</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Samantha Ebersole  "><td>Samantha Ebersole</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kelsey Bonette  "><td>Kelsey Bonette</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Casey Growtsch  "><td>Casey Growtsch</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="John Bobo  "><td>John Bobo</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Holly Robbin’s  "><td>Holly Robbin’s</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Jason Stibbe  "><td>Jason Stibbe</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Harry Schwartzberg  "><td>Harry Schwartzberg</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Donna Pittman  "><td>Donna Pittman</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Blake Freeman  "><td>Blake Freeman</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Rosemary Lowther  "><td>Rosemary Lowther</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Anna Luminais  "><td>Anna Luminais</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Jonathan Sheridan  "><td>Jonathan Sheridan</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Tom Jump  "><td>Tom Jump</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Candi Turgeau  "><td>Candi Turgeau</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kimberly Hyder  "><td>Kimberly Hyder</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="David Labbe  "><td>David Labbe</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Taylor Matrana  "><td>Taylor Matrana</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Nanci Douglas  "><td>Nanci Douglas</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Chris Cecil  "><td>Chris Cecil</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Brett Livaudais  "><td>Brett Livaudais</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Lauren Hudak  "><td>Lauren Hudak</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Guy Palermo  "><td>Guy Palermo</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Ashley Power  "><td>Ashley Power</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Hannah Mena  "><td>Hannah Mena</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Jason Fallon  "><td>Jason Fallon</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Ryan Della  "><td>Ryan Della</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Lee Stolf  "><td>Lee Stolf</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Kirk Colgan  "><td>Kirk Colgan</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Rhonda Thibaut  "><td>Rhonda Thibaut</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Stacey Stanson  "><td>Stacey Stanson</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Sarah Isaac  "><td>Sarah Isaac</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Matt Peek  "><td>Matt Peek</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Angel Liner  "><td>Angel Liner</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Jay Nettleton  "><td>Jay Nettleton</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Katie Harlow  "><td>Katie Harlow</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Nellie Hartell  "><td>Nellie Hartell</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Jennifer Gelpi  "><td>Jennifer Gelpi</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Michael Hurst  "><td>Michael Hurst</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Meredith Muller  "><td>Meredith Muller</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Erica Hingle  "><td>Erica Hingle</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Ruth Thompson  "><td>Ruth Thompson</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Cameryn Nugent  "><td>Cameryn Nugent</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Jackson Cosma  "><td>Jackson Cosma</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr><tr data-search="Danielle Guillot  "><td>Danielle Guillot</td><td></td><td></td><td class="r">1</td><td class="r amt hi">$25</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  </section>
+  <section class="raffle-page" data-raffle-page="crna">
+    <div class="raffle-hero">
+      <div>
+        <div class="eyebrow">Live Raffle View</div>
+        <h2>APEX CRNA Essential Bundle</h2>
+        <p>2026 totals and sales details with current-year reporting only.</p>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-label">Tickets Sold</span>
+        <span class="hero-stat-value">11</span>
+      </div>
+    </div>
+
+    <div class="tabs tabs-inner">
+      <button class="tab-btn active" onclick="switchTab('crna', 'dashboard', this)">Dashboard</button>
+      
+    </div>
+
+    <div id="tab-crna-dashboard" class="tab-panel active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Total Raised</div>
+          <div class="card-value gold">$210</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Tickets Sold</div>
+          <div class="card-value cyan">11</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Buyers</div>
+          <div class="card-value purp">4</div>
+        </div>
+      </div>
+
+      <div class="goal-card goal-card--empty"><div class="goal-title">No goal configured</div><div class="goal-empty-copy">Current totals are live, but this raffle does not have a progress target configured yet.</div></div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Daily Sales ($)</div>
+          <canvas id="crna-barChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Ticket Tier Mix</div>
+          <canvas id="crna-donutChart"></canvas>
+        </div>
+      </div>
+
+      <div class="leaderboard">
+        <div class="lb-title">Current-Year Supporters ($100+)</div>
+        <table>
+          <tbody><tr><td class="td-name">Jamie Huggins</td><td class="td-amount">$100</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="section section-note"><div class="sec-hdr"><span class="sec-title">Fresh Raffle</span></div><p class="sec-desc">APEX CRNA Essential Bundle is running without prior-year comparison data, so this page focuses on live totals and sales mix only.</p></div>
+    </div>
+
+    
+  <div id="tab-crna-retention" class="tab-panel">
+    <div class="section section-note">
+      <div class="sec-hdr">
+        <span class="sec-title">Current-Year Only</span>
+      </div>
+      <p class="sec-desc">No prior-year data exists yet for APEX CRNA Essential Bundle, so this page only shows live totals, ticket mix, and top buyers for 2026.</p>
+    </div>
+  </div>
+  </section>
+
+  <div class="footer">&copy; 2026 Team Sir Pork a Lot - unified raffle reporting</div>
+
+  <script>
+    const CYAN   = "#00e5ff";
+    const PINK   = "#ff00cc";
+    const GOLD   = "#ffd700";
+    const PURPLE = "#c084fc";
+    const GREEN  = "#4ade80";
+    const chartData = {"hogs": {"daily_labels": ["2026-02-26", "2026-03-03", "2026-03-04", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-14", "2026-03-15", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-21", "2026-03-22", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28", "2026-03-31", "2026-04-01", "2026-04-02", "2026-04-03", "2026-04-05", "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10", "2026-04-11", "2026-04-12", "2026-04-15"], "daily_values": [100.0, 1290.0, 785.0, 385.0, 60.0, 445.0, 320.0, 160.0, 1235.0, 1025.0, 395.0, 385.0, 1555.0, 285.0, 310.0, 565.0, 25.0, 360.0, 225.0, 1040.0, 720.0, 145.0, 770.0, 200.0, 560.0, 385.0, 360.0, 620.0, 200.0, 100.0, 360.0, 320.0, 280.0, 10705.0, 4095.0, 265.0, 160.0], "tier_labels": ["1 Ticket ($25)", "2 Tickets", "3 Tickets ($60)", "6 Tickets ($100)", "9 Tickets", "12 Tickets ($200)"], "tier_values": [89, 1, 141, 149, 1, 27], "chart_master_labels": ["02-18", "02-19", "02-20", "02-21", "02-22", "02-23", "02-24", "02-25", "02-26", "02-27", "02-28", "03-01", "03-02", "03-03", "03-04", "03-05", "03-06", "03-07", "03-08", "03-09", "03-10", "03-11", "03-12", "03-13", "03-14", "03-15", "03-16", "03-17", "03-18", "03-19", "03-20", "03-21", "03-22", "03-23", "03-24", "03-25", "03-26", "03-27", "03-28", "03-29", "03-30", "03-31", "04-01", "04-02", "04-03", "04-04", "04-05", "04-06", "04-07", "04-08", "04-09", "04-10", "04-11"], "chart_prev": [645.0, 1055.0, 1340.0, 2260.0, 2520.0, 2645.0, 3430.0, 3750.0, 3850.0, 4075.0, 4175.0, 4200.0, 4200.0, 4200.0, 4300.0, 4400.0, 4500.0, 4500.0, 5110.0, 5110.0, 5210.0, 6245.0, 6445.0, 8050.0, 8470.0, 8855.0, 8880.0, 9200.0, 9485.0, 10125.0, 10325.0, 10450.0, 10650.0, 10970.0, 11295.0, 11495.0, 11715.0, 12235.0, 12840.0, 12900.0, 13185.0, 13505.0, 14030.0, 14090.0, 14595.0, 16220.0, 23265.0, 23325.0, 23325.0, 24070.0, 24070.0, 24070.0, 24070.0], "chart_cur": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 100.0, 100.0, 100.0, 100.0, 100.0, 1390.0, 2175.0, 2175.0, 2560.0, 2560.0, 2560.0, 2620.0, 3065.0, 3385.0, 3545.0, 4780.0, 5805.0, 6200.0, 6585.0, 8140.0, 8425.0, 8735.0, 9300.0, 9325.0, 9685.0, 9910.0, 10950.0, 11670.0, 11815.0, 12585.0, 12785.0, 12785.0, 12785.0, 13345.0, 13730.0, 14090.0, 14710.0, 14710.0, 14910.0, 15010.0, 15370.0, 15690.0, 15970.0, 26675.0, 30770.0], "today_mmdd": "05-06", "has_history": true, "year": 2026, "prev_year": 2025}, "crna": {"daily_labels": ["2026-03-26", "2026-03-27"], "daily_values": [185.0, 25.0], "tier_labels": ["1 Ticket ($25)", "3 Tickets ($60)", "6 Tickets ($100)"], "tier_values": [2, 1, 1], "chart_master_labels": ["03-26", "03-27", "03-28", "03-29", "03-30", "03-31", "04-01", "04-02", "04-03", "04-04", "04-05", "04-06", "04-07", "04-08", "04-09", "04-10", "04-11"], "chart_prev": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "chart_cur": [185.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0, 210.0], "today_mmdd": "05-06", "has_history": false, "year": 2026, "prev_year": 2025}};
+    const chartRegistry = {};
+
+    function ensureDashboardCharts(slug) {
+      if (!chartRegistry[slug]) chartRegistry[slug] = {};
+      const cfg = chartData[slug];
+      if (!cfg) return;
+
+      if (!chartRegistry[slug].bar) {
+        const barCanvas = document.getElementById(slug + '-barChart');
+        if (barCanvas) {
+          chartRegistry[slug].bar = new Chart(barCanvas, {
+            type: 'bar',
+            data: {
+              labels: cfg.daily_labels,
+              datasets: [{
+                label: 'Daily Sales ($)',
+                data: cfg.daily_values,
+                backgroundColor: 'rgba(0,229,255,.25)',
+                borderColor: CYAN,
+                borderWidth: 2,
+                borderRadius: 6,
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { ticks: { color: '#a78bca', maxRotation: 45 }, grid: { color: 'rgba(192,132,252,.1)' } },
+                y: { ticks: { color: '#a78bca', callback: v => '$' + v }, grid: { color: 'rgba(192,132,252,.1)' } }
+              }
+            }
+          });
+        }
+      }
+
+      if (!chartRegistry[slug].donut) {
+        const donutCanvas = document.getElementById(slug + '-donutChart');
+        if (donutCanvas) {
+          chartRegistry[slug].donut = new Chart(donutCanvas, {
+            type: 'doughnut',
+            data: {
+              labels: cfg.tier_labels,
+              datasets: [{
+                data: cfg.tier_values,
+                backgroundColor: [CYAN, PINK, GOLD, PURPLE],
+                borderColor: '#0f0820',
+                borderWidth: 3,
+                hoverOffset: 8,
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { position: 'bottom', labels: { color: '#a78bca', padding: 14, font: { size: 11 } } },
+              }
+            }
+          });
+        }
+      }
+
+      Object.values(chartRegistry[slug]).forEach(chart => chart && chart.resize());
+    }
+
+    function ensureRetentionCharts(slug) {
+      if (!chartRegistry[slug]) chartRegistry[slug] = {};
+      const cfg = chartData[slug];
+      if (!cfg || !cfg.has_history || chartRegistry[slug].line) return;
+
+      const canvas = document.getElementById(slug + '-lineChart');
+      if (!canvas) return;
+
+      const tickLabels = cfg.chart_master_labels.map((label, index) => (index % 14 === 0 ? label : ''));
+      chartRegistry[slug].line = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels: cfg.chart_master_labels,
+          datasets: [
+            {
+              label: cfg.prev_year + ' Cumulative ($)',
+              data: cfg.chart_prev,
+              borderColor: PURPLE,
+              backgroundColor: 'rgba(192,132,252,.07)',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: false,
+              spanGaps: false,
+            },
+            {
+              label: cfg.year + ' Cumulative ($)',
+              data: cfg.chart_cur,
+              borderColor: CYAN,
+              backgroundColor: 'rgba(0,229,255,.07)',
+              borderWidth: 2.5,
+              pointRadius: 0,
+              tension: 0.3,
+              fill: false,
+              spanGaps: false,
+            },
+            {
+              label: 'Today',
+              data: cfg.chart_master_labels.map((label, index) => {
+                if (label !== cfg.today_mmdd) return null;
+                return Math.max(cfg.chart_prev[index] || 0, cfg.chart_cur[index] || 0) * 1.05;
+              }),
+              borderColor: 'rgba(255,215,0,.7)',
+              borderWidth: 1.5,
+              borderDash: [4, 4],
+              pointRadius: 6,
+              pointStyle: 'line',
+              pointBorderColor: GOLD,
+              showLine: false,
+              spanGaps: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { color: '#a78bca', font: { size: 11 }, padding: 16 } },
+            tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toLocaleString() } },
+          },
+          scales: {
+            x: { ticks: { color: '#a78bca', maxRotation: 45, callback: (value, index) => tickLabels[index] }, grid: { color: 'rgba(192,132,252,.08)' } },
+            y: { ticks: { color: '#a78bca', callback: value => '$' + value.toLocaleString() }, grid: { color: 'rgba(192,132,252,.08)' } },
+          },
+        }
+      });
+      chartRegistry[slug].line.resize();
+    }
+
+    function switchRaffle(slug, btn) {
+      document.querySelectorAll('[data-raffle-page]').forEach(page => page.classList.remove('active'));
+      document.querySelectorAll('[data-raffle-btn]').forEach(button => button.classList.remove('active'));
+      document.querySelector('[data-raffle-page="' + slug + '"]').classList.add('active');
+      btn.classList.add('active');
+      ensureDashboardCharts(slug);
+      const activeTab = document.querySelector('[data-raffle-page="' + slug + '"] .tab-panel.active');
+      if (activeTab && activeTab.id.endsWith('-retention')) ensureRetentionCharts(slug);
+    }
+
+    function switchTab(slug, name, btn) {
+      const page = document.querySelector('[data-raffle-page="' + slug + '"]');
+      page.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+      page.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
+      page.querySelector('#tab-' + slug + '-' + name).classList.add('active');
+      btn.classList.add('active');
+      if (name === 'dashboard') ensureDashboardCharts(slug);
+      if (name === 'retention') ensureRetentionCharts(slug);
+    }
+
+    function filterTable(tableId, query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll('#' + tableId + ' tbody tr').forEach(tr => {
+        const s = (tr.dataset.search || tr.innerText).toLowerCase();
+        tr.classList.toggle('hidden', q.length > 0 && !s.includes(q));
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const firstSlug = "hogs";
+      ensureDashboardCharts(firstSlug);
+    });
+  </script>
+</body>
+</html>
