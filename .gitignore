@@ -48,6 +48,13 @@ dashboard/dist/
 data/generated/
 *.xlsx
 
+# database dumps and customer data (never commit PII)
+# already-tracked files such as data/reference/*.csv stay tracked
+*.csv
+data.sql
+*backup*.zip
+supabase/backup/data*
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
